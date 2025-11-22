@@ -318,4 +318,448 @@ const ENGINE = {
         'forecast': { type: 'info', text: 'project balance' },
         'import': { type: 'branch', branches: { 'replace': {type:'info',text:'overwrite'}, 'append': {type:'info',text:'add'} } },
         'export': { type: 'branch', branches: { 'copy': {type:'info',text:'to clipboard'}, 'file': {type:'info',text:'download'} } },
-        'budget': {
+        'budget': { type: 'branch', branches: { 'rm': { type: 'enum', options: () => Object.keys(BudgetManager.get()) } }, dynamic: () => Object.keys(BudgetManager.get()) },
+        'alias': { type: 'branch', branches: { 'list': {type:'info',text:'show all'}, 'rm': { type: 'enum', options: () => Object.keys(AliasManager.list()) } } },
+        'recur': { type: 'query', hint: '<search>' },
+        'rm': { type: 'query', hint: '<id>' },
+        'theme': { type: 'branch', branches: { 'default': null, 'matrix': null, 'dracula': null, 'paper': null, 'font': { type: 'params', options: ['12px', '14px', '16px', '18px'] }, 'bg': { type: 'hint', text: '#hex' }, 'text': { type: 'hint', text: '#hex' }, 'reset': null } },
+        'ledger': { type: 'branch', branches: { 'list': null, 'new': { type: 'hint', text: '<name>' }, 'switch': { type: 'enum', options: () => LedgerManager.list() } } },
+        'graph': { type: 'branch', branches: { 'trend': { type: 'params', options: ['filter:', 'sort:', 'date:'] }, 'exp': { type: 'params', options: ['filter:', 'sort:', 'date:'] }, 'pie': { type: 'params', options: ['filter:', 'date:'] } } },
+        'pnl': { type: 'query' }, 'bal': { type: 'query' }, 'reg': { type: 'query' },
+        'add': { type: 'info', text: 'new transaction' }, 'reset': { type: 'info', text: 'reset theme' }
+    },
+    accounts: [],
+    predict(input) {
+        if (!input) return { suggest: '', context: 'Command', options: Object.keys(this.schema).map(k=>({text:k, type:'cmd'})) };
+        const parts = input.split(' '); const cmd = parts[0]; const lastArg = parts[parts.length - 1];
+        if (parts.length === 1) {
+            const matches = Object.keys(this.schema).filter(k => k.startsWith(cmd));
+            if (matches.length === 1 && matches[0] !== cmd) return { suggest: matches[0].substring(cmd.length), context:'Command', options: matches.map(k=>({text:k, type:'cmd'})) };
+            if (matches.length > 0 && input.endsWith(' ')) return this.getNextStep(cmd, [], '');
+            return { suggest: '', context:'Command', options: matches.map(k=>({text:k, type:'cmd'})) };
+        }
+        return this.getNextStep(cmd, parts.slice(1), lastArg);
+    },
+    getNextStep(cmd, args, lastArg) {
+        const node = this.schema[cmd]; if (!node) return { suggest: '', options: [] };
+        if (node.type === 'info') return { suggest: '', context: 'Info', options: [{ isHint: true, text: node.text, type:'info' }] };
+        if (node.type === 'branch') {
+            const subCmd = args[0];
+            if ((cmd==='budget'||cmd==='coa') && args.length===0 && !lastArg.endsWith(' ') && node.dynamic) return { suggest: '', context:'Option', options: node.dynamic().concat(Object.keys(node.branches)).map(k=>({text:k, type:'opt'})) };
+            
+            if (!subCmd || (args.length === 1 && !lastArg.endsWith(' '))) {
+                const options = Object.keys(node.branches); const matches = options.filter(o => o.startsWith(lastArg || ''));
+                let ghost = ''; if (matches.length === 1 && subCmd && matches[0] !== subCmd) ghost = matches[0].substring(subCmd.length);
+                return { suggest: ghost, context:'Subcmd', options: matches.map(k=>({text:k, type:'opt'})) };
+            }
+            if (node.branches[subCmd]) {
+                const subNode = node.branches[subCmd];
+                if (subNode.type === 'params') return this.getParamPrediction(args.slice(1), lastArg, subNode.options);
+                if (subNode.type === 'hint' || subNode.type === 'info') return { suggest: '', context:'Input', options: [{ isHint: true, text: subNode.text, type:'info' }] };
+                if (subNode.type === 'enum') return this.getEnumPrediction(args[1], subNode.options());
+            }
+        }
+        if (node.type === 'enum') return this.getEnumPrediction(args[0], node.options());
+        if (node.type === 'query' || lastArg.includes(':')) return this.getCompositePrediction(lastArg, node.context || 'Filter');
+        return { suggest: '', context:'Unknown', options: [] };
+    },
+    getEnumPrediction(curr, opts) {
+        const matches = opts.filter(o => o.startsWith(curr||'')); let ghost = '';
+        if (matches.length > 0 && curr && matches[0] !== curr) ghost = matches[0].substring(curr.length);
+        return { suggest: ghost, context:'Option', options: matches.map(k=>({text:k, type:'opt'})) };
+    },
+    getParamPrediction(args, lastArg, validParams) {
+        if (!lastArg.includes(':')) {
+             const matches = validParams.filter(p => p.startsWith(lastArg));
+             return { suggest: matches.length===1?matches[0].substring(lastArg.length):'', context:'Param', options: matches.map(k=>({text:k, type:'param'})) };
+        }
+        return this.getCompositePrediction(lastArg, 'Value');
+    },
+    getCompositePrediction(str, contextLabel) {
+        const [key, val] = str.includes(':') ? str.split(':') : ['', str];
+        const prefix = str.includes(':') ? key + ':' : ''; const search = val || key;
+        let results = [];
+        const accMatches = this.accounts.filter(a => a.includes(search || ''));
+        accMatches.forEach(a => results.push({ text: prefix + a, type: 'acc' }));
+        if (!str.includes(':') || key === 'date') {
+            const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0');
+            if (('date:'+y).startsWith(str)) results.push({ text: `date:${y}`, type: 'date' });
+            if (('date:'+y+'-'+m).startsWith(str)) results.push({ text: `date:${y}-${m}`, type: 'date' });
+        }
+        if (!str.includes(':') || key === 'depth') { ['depth:2', 'depth:3'].forEach(o => { if(o.startsWith(str)) results.push({ text: o, type: 'cmd' }); }); }
+        if (!str.includes(':') || key === 'amt') { ['amt:>', 'amt:<'].forEach(o => { if(o.startsWith(str)) results.push({ text: o, type: 'param' }); }); }
+        
+        const finalOptions = results.filter(o => o.text.startsWith(str));
+        let ghost = '';
+        if (finalOptions.length > 0) { const strict = finalOptions.find(a => a.text.startsWith(str)); if (strict) ghost = strict.text.substring(str.length); }
+        return { suggest: ghost, context: contextLabel, options: finalOptions };
+    }
+};
+
+/* =========================================
+   UI & COMMANDS
+   ========================================= */
+const content = document.getElementById('terminal-content');
+const container = document.getElementById('terminal-container');
+const input = document.getElementById('cmd-input');
+const ghost = document.getElementById('ghost-text');
+const suggs = document.getElementById('suggestions');
+const tabBtn = document.getElementById('tab-btn');
+const inputWrapper = document.getElementById('input-wrapper');
+const fileInput = document.getElementById('file-input');
+const ctxBadge = document.getElementById('context-badge');
+
+let wizard = null; let importMode = 'append'; let activeFilter = 'all'; 
+
+function log(msg, type='text') {
+    const div = document.createElement('div'); div.className = `line ${type}`; div.innerHTML = msg;
+    content.appendChild(div); container.scrollTop = container.scrollHeight;
+}
+
+function run(raw) {
+    const val = raw.trim().toLowerCase();
+    if (wizard) { return Wizard.step(val); }
+    if (!val) return; 
+    log(val, 'cmd');
+    const mathRes = MathEngine.eval(val);
+    if (mathRes !== null && !ENGINE.schema[val.split(' ')[0]]) { log(`= ${mathRes}`, 'success'); return; }
+    
+    const parts = val.split(' '); const verb = parts[0]; const args = parts.slice(1);
+
+    if (verb === 'coa') {
+        if (args[0] === 'add') {
+            if (!args[1]) return log("Usage: coa add <name>", 'warn');
+            LedgerManager.append(`account ${args[1]}`);
+            log(`Account '${args[1]}' created.`, 'success');
+        } else if (args[0] === 'list') {
+            log(ENGINE.accounts.join('<br>'));
+        } else {
+            renderCOA(args.join(' '));
+        }
+    }
+    else if (verb === 'check') {
+        let errs = 0; transactions.forEach(t=>{ let sum=0; t.posts.forEach(p=>sum+=p.amt); if(Math.abs(sum)>0.01){errs++; log(`Txn #${t.id} unbalanced: ${sum.toFixed(2)}`,'error');}});
+        if(errs===0) log("Integrity Check Passed.",'success'); else log(`Found ${errs} errors.`,'warn');
+    }
+    else if (verb === 'bs') {
+        let assets=0, liab=0, equity=0, income=0, expenses=0; const q = args.join(' ');
+        transactions.filter(t => match(t, q)).forEach(t => {
+            t.posts.forEach(p => {
+                if (p.acc.startsWith('assets')) assets += p.amt;
+                else if (p.acc.startsWith('liabilities')) liab += p.amt;
+                else if (p.acc.startsWith('equity')) equity += p.amt;
+                else if (p.acc.startsWith('income')) income += p.amt;
+                else if (p.acc.startsWith('expenses')) expenses += p.amt;
+            });
+        });
+        const retained = income + expenses; const netWorth = assets + liab;
+        log(`<div class="pnl-head">Balance Sheet ${q?'('+q+')':''}</div><div class="pnl-row"><span>Assets</span><span style="color:var(--success)">${assets.toFixed(2)}</span></div><div class="pnl-row"><span>Liabilities</span><span style="color:var(--error)">${liab.toFixed(2)}</span></div><div class="pnl-row"><span>Equity</span><span>${equity.toFixed(2)}</span></div><div class="pnl-row"><span>Retained Earnings</span><span>${retained.toFixed(2)}</span></div><div class="pnl-row pnl-total"><span>Net Worth</span><span>${netWorth.toFixed(2)}</span></div>`);
+    }
+    else if (verb === 'man') {
+        const topic = args[0];
+        if (!topic) log("Usage: man <command>. Type 'man' to see list.", 'warn');
+        else if (MAN_PAGES[topic]) log(MAN_PAGES[topic]);
+        else log("No manual entry for " + topic, 'error');
+    }
+    else if (verb === 'dash') {
+        let income = 0, expenses = 0, assets = 0; const now = new Date(); const ym = now.toISOString().slice(0, 7);
+        transactions.forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('assets')) assets += p.amt; if (t.date.startsWith(ym)) { if (p.acc.startsWith('income')) income += p.amt; if (p.acc.startsWith('expenses')) expenses += p.amt; } }); });
+        log(`<div class="dash-grid"><div class="dash-card"><div class="dash-label">Net Worth</div><div class="dash-val">$${assets.toFixed(0)}</div></div><div class="dash-card"><div class="dash-label">Burn Rate (Mo)</div><div class="dash-val" style="color:var(--error)">$${expenses.toFixed(0)}</div></div><div class="dash-card dash-row"><div class="dash-label">Income (This Month)</div><div class="dash-val" style="color:var(--success)">$${Math.abs(income).toFixed(0)}</div></div></div>`);
+    }
+    else if (verb === 'stats') {
+        const txCount = transactions.length; const accCount = ENGINE.accounts.length; const first = transactions[0]?.date || 'N/A'; const last = transactions[txCount-1]?.date || 'N/A';
+        log(`<div class="stat-row"><span>Transactions</span><span>${txCount}</span></div><div class="stat-row"><span>Accounts</span><span>${accCount}</span></div><div class="stat-row"><span>Date Range</span><span>${first} to ${last}</span></div><div class="stat-row"><span>Ledger Size</span><span>${(LedgerManager.getRaw().length/1024).toFixed(1)} KB</span></div>`);
+    }
+    else if (verb === 'rm') {
+        const id = parseInt(args[0]); if (isNaN(id)) return log("Usage: rm <id>", 'warn');
+        if (LedgerManager.delete(id)) log(`Transaction #${id} deleted.`, 'success'); else log(`ID #${id} not found.`, 'error');
+    }
+    else if (verb === 'reg') {
+        const subset = transactions.slice(-30).filter(t => match(t, args.join(' ')));
+        if (!subset.length) return log("No matches.", 'system');
+        subset.forEach(t => {
+            const posts = t.posts.map(p => `<div style="display:flex;justify-content:space-between;padding-left:10px;font-size:0.9em;opacity:0.8"><span>${p.acc}</span><span class="${p.amt<0?'neg':''}">${(p.amt||0).toFixed(2)}</span></div>`).join('');
+            log(`<div style="margin-top:10px;border-left:2px solid var(--accent);padding-left:8px;"><div style="color:var(--primary)"><span class="txn-id">#${t.id}</span>${t.date} <span style="color:var(--text)">${t.desc}</span></div>${posts}</div>`);
+        });
+    }
+    else if (verb === 'edit') window.Editor.open();
+    else if (verb === 'import') { importMode = args[0] === 'replace' ? 'replace' : 'append'; fileInput.click(); }
+    else if (verb === 'forecast') {
+        const now = new Date(); const past90 = new Date(now); past90.setDate(now.getDate() - 90); const iso90 = past90.toISOString().slice(0,10);
+        let income = 0, expenses = 0, assets = 0;
+        transactions.forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('assets')) assets += (p.amt||0); }); if (t.date >= iso90) t.posts.forEach(p => { if (p.acc.startsWith('income')) income += (p.amt||0); if (p.acc.startsWith('expenses')) expenses += (p.amt||0); }); });
+        const dailyAvg = (income+expenses)*-1 / 90; const predicted30 = assets + (dailyAvg * 30);
+        log(`<div class="pnl-head">30-Day Forecast</div><div class="pnl-row"><span>Current</span><span>$${assets.toFixed(0)}</span></div><div class="pnl-row"><span>90d Avg/Day</span><span>$${dailyAvg.toFixed(2)}</span></div><div class="pnl-row pnl-total"><span>Projected</span><span style="color:${dailyAvg>0? 'var(--success)':'var(--error)'}">$${predicted30.toFixed(0)}</span></div>`);
+    }
+    else if (verb === 'recur') {
+        const query = args.join(' '); if (!query) return log("Usage: recur <query>", 'warn');
+        const found = [...transactions].reverse().find(t => match(t, query));
+        if (!found) return log("No match.", 'error');
+        if (found.posts.length < 2) return log("Too complex.", 'warn');
+        Wizard.start({ desc: found.desc, acc1: found.posts[0].acc, amt: Math.abs(found.posts[0].amt).toFixed(2), acc2: found.posts[1].acc });
+        log(`Recurring: ${found.desc}`, 'success');
+    }
+    else if (verb === 'budget') {
+        if (!args[0]) {
+            const bals = {}; const now = new Date(); const ym = now.toISOString().slice(0, 7);
+            transactions.forEach(t => { if (!t.date.startsWith(ym)) return; t.posts.forEach(p => { if (p.acc.startsWith('expenses')) bals[p.acc] = (bals[p.acc] || 0) + (p.amt||0); }); });
+            const budgets = BudgetManager.get(); if (Object.keys(budgets).length === 0) return log("No budgets set.", 'warn');
+            Object.entries(budgets).forEach(([cat, limit]) => {
+                let spent = 0; Object.keys(bals).forEach(acc => { if (acc.includes(cat)) spent += bals[acc]; });
+                const pct = Math.min(100, (spent / limit) * 100); let cls = 'budget-fill'; if (pct > 85) cls += ' warn'; if (spent > limit) cls += ' over';
+                log(`<div class="budget-row"><div class="budget-label"><span>${cat}</span><span>$${spent.toFixed(0)} / $${limit}</span></div><div class="budget-track"><div class="${cls}" style="width:${pct}%"></div></div></div>`);
+            });
+        } else if (args[0] === 'rm') { BudgetManager.remove(args[1]); log(`Removed.`, 'success'); }
+        else if (args[1]) { BudgetManager.set(args[0], args[1]); log(`Set.`, 'success'); }
+    }
+    else if (verb === 'alias') {
+        if (!args[0] || args[0] === 'list') { const list = AliasManager.list(); if(Object.keys(list).length === 0) log("No aliases.", 'system'); else Object.entries(list).forEach(([k,v]) => log(`${k} -> ${v}`, 'text')); }
+        else if (args[0] === 'rm') { AliasManager.remove(args[1]); log(`Removed.`, 'success'); }
+        else if (args[1]) { AliasManager.set(args[0], args[1]); log(`Saved.`, 'success'); }
+    }
+    else if (verb === 'undo') {
+        const raw = LedgerManager.getRaw(); const blocks = raw.trim().split(/\n\s*\n/);
+        if (blocks.length <= 1) return log("Nothing to undo.", 'warn');
+        blocks.pop(); LedgerManager.save(blocks.join('\n\n') + '\n'); LedgerManager.load(); log("Undone.", 'success');
+    }
+    else if (verb === 'pnl') {
+        const q = args.join(' '); let inc = 0, exp = 0;
+        transactions.filter(t => match(t, q)).forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('income')) inc += (p.amt||0); if (p.acc.startsWith('expenses')) exp += (p.amt||0); }); });
+        const net = inc + exp; 
+        log(`<div class="pnl-head">P&L ${q?`(${q})`:''}</div>`);
+        log(`<div class="pnl-row"><span>Income</span><span style="color:var(--success)">${inc.toFixed(2)}</span></div>`);
+        log(`<div class="pnl-row"><span>Expenses</span><span style="color:var(--error)">${exp.toFixed(2)}</span></div>`);
+        log(`<div class="pnl-row pnl-total"><span>Net</span><span style="color:${net<0?'var(--success)':'var(--text)'}">${net.toFixed(2)}</span></div>`);
+    }
+    else if (verb === 'theme') {
+        if (args[0] === 'reset') { ThemeManager.reset(); log("Theme reset.", 'success'); }
+        else if (args[0] === 'font') { ThemeManager.setFont(args[1]); log("Font set.", 'success'); }
+        else if (args[0] === 'bg') { ThemeManager.setBg(args[1]); log("BG set.", 'success'); }
+        else if (args[0] === 'text') { ThemeManager.setText(args[1]); log("Text set.", 'success'); }
+        else if (args[0]) { ThemeManager.setPreset(args[0]); log(`Theme: ${args[0]}`, 'success'); }
+    }
+    else if (verb === 'strict') { const s = SETTINGS.toggleStrict(); log(`Strict: ${s?'ON':'OFF'}`, s?'success':'warn'); }
+    else if (verb === 'ledger') { if(args[0]==='new'||args[0]==='switch') LedgerManager.switch(args[1]); else log(LedgerManager.list().join(', '), 'system'); }
+    else if (verb === 'bal') {
+        const b = {}; transactions.filter(t=>match(t, args.join(' '))).forEach(t=>t.posts.forEach(p=>b[p.acc]=(b[p.acc]||0)+(p.amt||0)));
+        Object.keys(b).sort().forEach(k=>Math.abs(b[k])>0.01 && logRow(k, b[k]));
+    }
+    else if (verb === 'graph') {
+        const type = args[0]; const filter = args.slice(1).join(' '); const b = {};
+        if (type === 'pie') {
+            let total = 0; const filterStr = filter || 'expenses';
+            transactions.filter(t => match(t, filterStr)).forEach(t => { t.posts.forEach(p => { if (p.acc.includes(filterStr)) { b[p.acc] = (b[p.acc]||0) + (p.amt||0); total += (p.amt||0); } }); });
+            const sorted = Object.entries(b).sort((a,b) => b[1] - a[1]).slice(0, 5); if (sorted.length === 0) return log("No data.", 'warn');
+            let svg = `<svg viewBox="-1 -1 2 2" style="transform: rotate(-90deg); width:150px; height:150px;">`; let cum = 0; const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
+            sorted.forEach(([k,v], i) => { const percent = v / total; const start = cum * 2 * Math.PI; const end = (cum + percent) * 2 * Math.PI; const x1 = Math.cos(start), y1 = Math.sin(start); const x2 = Math.cos(end), y2 = Math.sin(end); const large = percent > 0.5 ? 1 : 0; const d = `M 0 0 L ${x1} ${y1} A 1 1 0 ${large} 1 ${x2} ${y2} Z`; svg += `<path d="${d}" fill="${colors[i%colors.length]}"></path>`; cum += percent; }); svg += `</svg>`;
+            let legend = `<div style="font-size:11px; margin-left:10px;">`; sorted.forEach(([k,v], i) => { legend += `<div style="display:flex;align-items:center;margin-bottom:2px;"><div style="width:8px;height:8px;background:${colors[i%colors.length]};margin-right:6px;border-radius:50%"></div><span style="flex:1;opacity:0.8">${k.split(':').pop()}</span><span>${Math.round((v/total)*100)}%</span></div>`; }); legend += `</div>`;
+            log(`<div style="margin:10px 0; padding:10px; background:var(--panel); border-radius:8px; display:flex; align-items:center;">${svg}${legend}</div>`);
+        } else {
+            const isExp = (type === 'exp'); const fStr = filter || (isExp?'expenses':''); transactions.filter(t=>match(t, fStr)).forEach(t=>t.posts.forEach(p=>b[p.acc]=(b[p.acc]||0)+(p.amt||0)));
+            const entries = Object.entries(b).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5); 
+            const max = entries[0]?.[1]||1;
+            log(`<div style="margin:10px 0;border:1px solid var(--accent);padding:10px;border-radius:8px"><div style="color:var(--accent);font-size:11px;margin-bottom:5px">graph: ${fStr}</div>${entries.map(e=>`<div style="display:flex;align-items:center;margin:4px 0;font-size:11px"><div style="width:60px;overflow:hidden;text-align:right;margin-right:8px">${e[0].split(':').pop()}</div><div style="flex:1;background:var(--bg);height:10px;border:1px solid var(--accent)"><div style="height:100%;background:var(--primary);width:${(e[1]/max)*100}%"></div></div><div style="width:40px;text-align:right">${Math.round(e[1])}</div></div>`).join('')}</div>`);
+        }
+    }
+    else if (verb === 'export') {
+        const rawData = LedgerManager.getRaw();
+        if (args[0] === 'copy') { navigator.clipboard.writeText(rawData).then(() => log("Copied.", 'success')); } 
+        else { const blob = new Blob([rawData], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ledger_${new Date().toISOString().split('T')[0]}.hledger`; a.click(); log("Downloaded.", 'success'); }
+    }
+    else if (verb === 'add') { Wizard.start(); }
+    else if (verb === 'clear') { content.innerHTML = ''; }
+    else if (verb === 'help') { log("edit, rm, dash, stats, import, forecast, budget, recur, undo, pnl, alias, bal, reg, coa, graph, strict, export, add, ledger, theme", 'system'); }
+    else { log("unknown command.", 'error'); }
+}
+
+/* =========================================
+   WIZARD
+   ========================================= */
+const Wizard = {
+    state: 0, postings: [], data: {},
+    start(seedData = {}) { 
+        this.state = 0; this.postings = []; this.data = {...seedData};
+        wizard = this; document.body.classList.add('wizard-mode');
+        this.ask();
+    },
+    ask() {
+        document.getElementById('prompt-char').innerText = '?';
+        if (this.state === 0) { log("Date? [Today]", 'system'); input.placeholder = new Date().toISOString().split('T')[0]; }
+        else if (this.state === 1) { log("Description?", 'system'); input.placeholder = this.data.desc || ''; }
+        else if (this.state === 2) {
+            this.renderDraft();
+            const pIdx = Math.floor(this.postings.length / 2);
+            const isAcc = this.postings.length % 2 === 0;
+            if (isAcc) {
+                if (this.postings.length >= 2 && Math.abs(this.getBalance()) < 0.01) log(`Balanced. Enter to Save or Add Account ${pIdx+1}.`, 'system');
+                else log(`Account ${pIdx+1}?`, 'system');
+            } else {
+                const bal = this.getBalance();
+                log(`Amount ${pIdx+1}? [${bal !== 0 ? (bal * -1).toFixed(2) : ''}]`, 'system');
+                input.placeholder = bal !== 0 ? (bal * -1).toFixed(2) : '';
+            }
+        }
+        else if (this.state === 3) { this.renderDraft(); log("Save Transaction? (Y/n)", 'system'); }
+        activeFilter = 'all'; updateContextBadge([]);
+    },
+    renderDraft() {
+        let html = `<div class="draft-box"><div class="draft-head">${this.data.date || '...'} ${this.data.desc || ''}</div>`;
+        for (let i=0; i<this.postings.length; i+=2) html += `<div class="draft-row"><span>${this.postings[i]}</span><span>${this.postings[i+1] || '...'}</span></div>`;
+        log(html + `</div>`);
+    },
+    step(val) {
+        if (this.state === 0) { this.data.date = val || new Date().toISOString().split('T')[0]; this.state = 1; this.ask(); return; }
+        if (this.state === 1) { this.data.desc = val || 'Transaction'; this.state = 2; this.ask(); return; }
+        if (this.state === 2) {
+            const isAcc = this.postings.length % 2 === 0;
+            if (isAcc) {
+                if (!val) {
+                    if (this.postings.length >= 2 && Math.abs(this.getBalance()) < 0.01) { this.state = 3; this.ask(); return; }
+                }
+                if (!val) return;
+                val = AliasManager.resolve(val);
+                if (SETTINGS.strictMode && !ENGINE.accounts.includes(val)) { log(`Strict: '${val}' unknown.`, 'error'); return; }
+                this.postings.push(val); this.ask();
+            } else {
+                let amt = val;
+                if (!amt) {
+                    const bal = this.getBalance();
+                    if (Math.abs(bal) > 0.001) amt = (bal * -1).toFixed(2);
+                    else return;
+                }
+                const m = MathEngine.eval(amt); if (m) amt = m;
+                this.postings.push(amt); this.ask();
+            }
+            return;
+        }
+        if (this.state === 3) {
+            if (['n','no','cancel'].includes(val)) {
+                log("Cancelled.", 'warn'); wizard = null; document.body.classList.remove('wizard-mode'); document.getElementById('prompt-char').innerText = '$'; input.placeholder = ''; return;
+            }
+            let out = `\n${this.data.date} ${this.data.desc}\n`;
+            for (let i=0; i<this.postings.length; i+=2) out += `    ${this.postings[i]}    $${this.postings[i+1]}\n`;
+            LedgerManager.save(localStorage.getItem('HL_DATA_'+LedgerManager.current) + out);
+            LedgerManager.load(); log("Saved.", 'success');
+            wizard = null; document.body.classList.remove('wizard-mode'); document.getElementById('prompt-char').innerText = '$'; input.placeholder = '';
+        }
+        updatePrediction();
+    },
+    getBalance() { let sum = 0; for (let i=1; i<this.postings.length; i+=2) sum += parseFloat(this.postings[i]); return sum; },
+    getSuggs(val) {
+        if (this.state === 0) return ['today', 'yesterday'].map(d=>({text:d, type:'date'}));
+        if (this.state === 2) {
+            if (this.postings.length % 2 === 0) return ENGINE.accounts.filter(a=>a.includes(val)).map(a=>({text:a, type:'acc'}));
+        }
+        if (this.state === 3) return [{text:'yes',type:'opt'}, {text:'no',type:'opt'}];
+        return [];
+    }
+};
+
+function renderCOA(filter) {
+    // Render full tree even if filter matches children
+    const accounts = ENGINE.accounts; 
+    // If filter, we only show nodes that match or have matching children
+    const tree = {};
+    accounts.forEach(acc => { 
+        if (filter && !acc.includes(filter)) return; // Basic filtering
+        const parts = acc.split(':'); let curr = tree; 
+        parts.forEach(p => { if (!curr[p]) curr[p] = {}; curr = curr[p]; }); 
+    });
+    
+    function buildTreeHtml(node, depth = 0, prefix = '') {
+        let html = ''; const keys = Object.keys(node).sort();
+        keys.forEach(k => { 
+            const fullPath = prefix ? prefix + ':' + k : k;
+            const isLeaf = Object.keys(node[k]).length === 0;
+            const isExplicit = definedAccounts.has(fullPath);
+            const cls = isExplicit ? 'tree-name explicit' : 'tree-name';
+            const action = `onclick="fill('${fullPath}')"`;
+            html += `<div class="tree-item" style="margin-left:${depth * 12}px">
+                <span class="tree-marker">└</span>
+                <span class="${cls}" ${action}>${k}</span>
+            </div>`;
+            html += buildTreeHtml(node[k], depth + 1, fullPath);
+        });
+        return html;
+    }
+    
+    const html = buildTreeHtml(tree);
+    if (!html) return log("No accounts found.", 'warn');
+    log(`<div class="tree-container">${html}</div>`);
+}
+function logRow(k, v) { log(`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--panel);padding:2px 0"><span style="opacity:0.9">${k}</span><span style="font-weight:bold;color:${v<0?'var(--error)':'var(--text)'}">$${v.toFixed(2)}</span></div>`); }
+
+/* =========================================
+   CONTEXT LOGIC
+   ========================================= */
+const availableContexts = ['all', 'acc', 'date', 'cmd', 'param'];
+function cycleContext() {
+    const currIdx = availableContexts.indexOf(activeFilter);
+    activeFilter = availableContexts[(currIdx + 1) % availableContexts.length];
+    input.focus(); updatePrediction();
+}
+function updateContextBadge(options) {
+    const types = new Set(options.map(o => o.type));
+    if (types.size <= 1) {
+        if (types.size === 1) {
+            const t = [...types][0].toUpperCase(); ctxBadge.innerText = `[${t}]`; ctxBadge.classList.remove('hidden');
+            if (activeFilter !== 'all') activeFilter = 'all';
+        } else ctxBadge.classList.add('hidden');
+    } else { ctxBadge.innerText = `[${activeFilter.toUpperCase()}]`; ctxBadge.classList.remove('hidden'); }
+}
+
+/* =========================================
+   PREDICTION RENDERER
+   ========================================= */
+let ghostSuffix = '';
+function updatePrediction() {
+    input.value = input.value.toLowerCase(); const val = input.value; const mathRes = MathEngine.eval(val);
+    let options = [];
+    if (wizard) { 
+        ghost.innerText = ''; tabBtn.classList.remove('visible'); options = Wizard.getSuggs(val); 
+        if (Wizard.state === 2 && Wizard.postings.length % 2 !== 0) {
+            const bal = Wizard.getBalance();
+            if (Math.abs(bal) > 0.001) { const fix = (bal * -1).toFixed(2); options.unshift({ text: fix, type: 'math' }); }
+        }
+    } 
+    else {
+        const result = ENGINE.predict(val); ghostSuffix = result.suggest;
+        if (ghostSuffix) { tabBtn.classList.add('visible'); ghost.innerHTML = `<span style="opacity:0">${val}</span>` + ghostSuffix; } 
+        else { tabBtn.classList.remove('visible'); ghost.innerHTML = ''; }
+        options = result.options;
+    }
+    updateContextBadge(options);
+    const filtered = activeFilter === 'all' ? options : options.filter(o => o.type === activeFilter);
+    let html = '';
+    if (mathRes && !ENGINE.schema[val.split(' ')[0]]) html += `<div class="chip math" onmousedown="event.preventDefault()" onclick="fill('${mathRes}')">= ${mathRes}</div>`;
+    html += filtered.slice(0, 10).map(opt => {
+        if (opt.type === 'math') return `<div class="chip math" onmousedown="event.preventDefault()" onclick="fill('${opt.text}')">Bal: ${opt.text}</div>`;
+        if (opt.isHint) return `<div class="chip hint" onmousedown="event.preventDefault()">${opt.text}</div>`;
+        return `<div class="chip" onmousedown="event.preventDefault()" onclick="completeChip('${opt.text}')">${opt.text}</div>`;
+    }).join('');
+    suggs.innerHTML = html;
+}
+
+window.acceptGhost = function() { if (ghostSuffix) { input.value += ghostSuffix; ghostSuffix = ''; input.focus(); updatePrediction(); } };
+window.completeChip = (text) => { const val = input.value; const parts = val.split(' '); if (val.endsWith(' ')) input.value += text; else { parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + text; } if (!text.endsWith(':')) input.value += ' '; input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
+window.fill = (s) => { if (wizard) { input.value = s; } else { input.value += s + ' '; } input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
+
+// GLOBAL EXPORT - CRITICAL
+window.Editor = {
+    el: document.getElementById('editor-modal'), area: document.getElementById('raw-editor'),
+    open() { this.area.value = LedgerManager.getRaw(); this.el.classList.add('open'); setTimeout(()=>this.area.focus(), 300); },
+    save() { LedgerManager.save(this.area.value); LedgerManager.load(); this.close(); log("Saved.", 'success'); },
+    close() { this.el.classList.remove('open'); },
+    copy() { navigator.clipboard.writeText(this.area.value).then(()=> { const btn = document.getElementById('copy-btn'); const original = btn.innerText; btn.innerText = "Copied!"; setTimeout(()=>btn.innerText=original, 1500); }); }
+};
+
+input.addEventListener('input', updatePrediction);
+input.addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key === 'ArrowRight') { e.preventDefault(); acceptGhost(); } if (e.key === 'Enter') { run(input.value); input.value = ''; updatePrediction(); } });
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}); container.scrollTop = container.scrollHeight; }); }
+
+LedgerManager.load();
+run('dash');
+updatePrediction();
+</script>
+</body>
+</html>
