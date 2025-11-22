@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Hledger V22</title>
+    <meta name="description" content="Offline CLI Accounting Tool">
     
-    <!-- 1. EMBEDDED MANIFEST (Base64 Encoded JSON) -->
-    <!-- This defines the app name, colors, and display mode without needing an external file -->
+    <!-- 1. PWA MANIFEST (Base64 Embedded - Same technique as Esnaf) -->
     <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhsZWRnZXIgVjIyIiwKICAic2hvcnRfbmFtZSI6ICJITGVkZ2VyIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjE3MmEiLAogICJ0aGVtZV9jb2xvciI6ICIjMGYxNzJhIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNRiY3B6ZEhWamFEd3hNREF3TVRnd01DQlRaV2Q4WDI1bIyNDhMM1JoY201emRHRnNaUzVoYldVOUlqeHdZWFJvT2lBOUlqQWdNQ0ExTVRJeE1USWlQajxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMGYxNzJhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGR5PSIuM2VtIiBmaWxsPSIjMzhiZGY4IiBmb250LXNpemU9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC13ZWlnaHQ9ImJvbGQiPiZndDtfPC90ZXh0Pjwvc3ZnPg==",\n      "sizes": "512x512",\n      "type": "image/svg+xml"\n    }\n  ]\n}">
 
-    <!-- 2. META TAGS FOR IOS/ANDROID -->
+    <!-- 2. META TAGS -->
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Hledger">
 
-    <!-- 3. EMBEDDED ICONS (Base64 SVG) -->
+    <!-- 3. ICONS (Base64) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
     <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
 
@@ -178,9 +178,8 @@
    4. SERVICE WORKER INJECTION (The "Esnaf" Method)
    ========================================= */
 window.onload = () => {
-    // 4.1 Dynamic Service Worker for Single File Offline Capability
     if('serviceWorker' in navigator){
-        // This code forces the browser to treat the current file ('.') as a cached asset
+        // Dynamic SW for Single File Offline Capability
         const swCode = `
         const CACHE_NAME = 'hledger-v22-offline';
         self.addEventListener('install', e => { 
@@ -192,21 +191,18 @@ window.onload = () => {
             e.respondWith(
                 fetch(e.request)
                 .then(res => { 
-                    // Clone and cache updated version on successful fetch
                     const c = res.clone(); 
                     caches.open(CACHE_NAME).then(cache => cache.put(e.request, c)); 
                     return res; 
                 })
-                .catch(() => caches.match(e.request)) // Fallback to cache if offline
+                .catch(() => caches.match(e.request))
             );
         });`;
         
-        // Create Blob from string and register
         const blob = new Blob([swCode], {type: 'text/javascript'});
-        const swUrl = URL.createObjectURL(blob);
-        navigator.serviceWorker.register(swUrl)
-            .then(() => console.log('SW Registered'))
-            .catch(err => console.log('SW Error:', err));
+        // We use .catch() here so if GitHub Pages blocks the blob, 
+        // the app DOES NOT CRASH and still runs (just maybe without offline support)
+        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => console.log('SW Error (Ignored)'));
     }
     
     LedgerManager.load();
@@ -221,7 +217,8 @@ let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    document.getElementById('install-btn').style.display = 'inline';
+    const btn = document.getElementById('install-btn');
+    if(btn) btn.style.display = 'inline';
 });
 
 async function installApp() {
