@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>Hledger V22 COA</title>
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Hledger V22","short_name":"HCLI","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
+    
+    <style>
+        :root {
+            --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0;
+            --primary: #38bdf8; --accent: #64748b; --ghost: #475569;
+            --warn: #fbbf24; --error: #f87171; --success: #4ade80;
+            --font: 'Menlo', 'Consolas', 'Fira Code', monospace;
+            --font-size: 13px;
+        }
+        [data-theme="matrix"] { --bg:#000; --panel:#0a0a0a; --text:#0f0; --primary:#0f0; --accent:#008f11; --ghost:#003300; --error:#f00; }
+        [data-theme="dracula"] { --bg:#282a36; --panel:#44475a; --text:#f8f8f2; --primary:#ff79c6; --accent:#6272a4; --ghost:#6272a4; }
+        [data-theme="paper"] { --bg:#fff; --panel:#f3f4f6; --text:#111; --primary:#000; --accent:#9ca3af; --ghost:#d1d5db; }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html { height: 100%; overscroll-behavior: none; }
+        body { 
+            margin: 0; background: var(--bg); color: var(--text); 
+            font-family: var(--font); position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; overflow: hidden; 
+        }
+
+        #status-bar { 
+            padding: 8px 1rem; font-size: 11px; 
+            background: var(--panel); color: var(--accent); 
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--accent); flex-shrink: 0; 
+        }
+        #status-right { display: flex; gap: 10px; align-items: center; }
+        #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
+        #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
+
+        #terminal-container { 
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; 
+            scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+        }
+        #terminal-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; padding-bottom: 10px; }
+        
+        .line { margin-bottom: 6px; word-break: break-word; font-size: var(--font-size); line-height: 1.5; }
+        .line.cmd { color: var(--accent); margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--panel); opacity: 0.8; }
+        .line.cmd::before { content: "➜ "; color: var(--primary); }
+        .line.system { color: var(--accent); font-style: italic; }
+        .line.error { color: var(--error); }
+        .line.success { color: var(--success); }
+
+        /* Tree Visualization */
+        .tree-container { margin-top: 8px; border-left: 1px solid var(--accent); padding-left: 4px; }
+        .tree-item { display: flex; align-items: center; padding: 2px 0; }
+        .tree-marker { color: var(--accent); margin-right: 6px; font-family: monospace; }
+        .tree-name { color: var(--text); cursor: pointer; transition: color 0.2s; }
+        .tree-name:hover { color: var(--primary); text-decoration: underline; }
+        .tree-name.explicit { font-weight: bold; color: var(--primary); } /* Explicitly defined accounts */
+
+        /* Reports & Dash */
+        .pnl-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--panel); }
+        .pnl-head { font-weight: bold; color: var(--primary); margin-top: 8px; border-bottom: 1px solid var(--accent); padding-bottom: 2px; }
+        .pnl-total { font-weight: bold; border-top: 1px solid var(--text); margin-top: 4px; padding-top: 4px; color: var(--text); }
+        .budget-row { margin-bottom: 8px; }
+        .budget-label { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.8; margin-bottom: 2px; }
+        .budget-track { height: 8px; background: var(--panel); border-radius: 4px; overflow: hidden; }
+        .budget-fill { height: 100%; background: var(--success); transition: width 0.3s; }
+        .budget-fill.warn { background: var(--warn); }
+        .budget-fill.over { background: var(--error); }
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .dash-card { background: var(--panel); padding: 10px; border-radius: 6px; border: 1px solid var(--accent); display: flex; flex-direction: column; }
+        .dash-label { font-size: 10px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+        .dash-val { font-size: 16px; font-weight: bold; color: var(--text); }
+        .dash-row { grid-column: span 2; }
+        .txn-id { color: var(--accent); font-size: 10px; margin-right: 8px; opacity: 0.7; }
+
+        /* Input */
+        #input-wrapper { background: var(--panel); padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
+        #suggestions-container { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; height: 30px; }
+        #context-badge { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); padding: 0 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: bold; min-width: 45px; text-align: center; height: 26px; display: flex; align-items: center; justify-content: center; }
+        #context-badge:active { background: var(--accent); color: var(--bg); }
+        #context-badge.hidden { display: none; }
+        #suggestions { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; height: 100%; align-items: center; }
+        .chip { background: var(--bg); color: var(--text); padding: 0 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; border: 1px solid var(--accent); cursor: pointer; opacity: 0.9; text-transform: lowercase; transition: background 0.2s; height: 26px; display: flex; align-items: center; }
+        .chip:active { background: var(--primary); color: var(--bg); }
+        .chip.hint { border: 1px dashed var(--accent); opacity: 0.6; cursor: default; font-style: italic; }
+        .chip.math { border: 1px solid var(--success); color: var(--success); font-weight: bold; background: rgba(74, 222, 128, 0.1); }
+        .input-stack { position: relative; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 0 8px 0 12px; height: 44px; }
+        .prompt { color: var(--primary); font-weight: bold; margin-right: 8px; white-space: pre; }
+        #cmd-input, #ghost-text { font-family: var(--font); font-size: 16px; position: absolute; left: 30px; right: 50px; top: 0; bottom: 0; background: transparent; border: none; outline: none; display: flex; align-items: center; padding: 0; margin: 0; text-transform: lowercase; }
+        #cmd-input { z-index: 2; color: var(--text); width: calc(100% - 80px); }
+        #ghost-text { z-index: 1; color: var(--ghost); pointer-events: none; white-space: pre; overflow: hidden; }
+        #tab-btn { position: absolute; right: 4px; z-index: 10; background: var(--panel); color: var(--primary); border: 1px solid var(--accent); border-radius: 4px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        #tab-btn.visible { opacity: 1; pointer-events: auto; }
+
+        #editor-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
+        #editor-modal.open { transform: translateY(0); }
+        #editor-toolbar { padding: 1rem; background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        #raw-editor { flex: 1; background: var(--bg); color: var(--text); border: none; padding: 1rem; font-family: var(--font); font-size: 14px; resize: none; outline: none; white-space: pre; }
+        .btn { padding: 6px 12px; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; }
+        .btn-primary { background: var(--primary); color: var(--bg); }
+        .btn-text { background: transparent; color: var(--error); }
+        .btn-icon { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+        body.wizard-mode .prompt { color: var(--warn); }
+    </style>
+</head>
+<body>
+
+<div id="status-bar">
+    <span>HLEDGER V22</span>
+    <div id="status-right">
+        <span id="strict-badge">STRICT</span>
+        <span id="ledger-badge">default</span>
+    </div>
+</div>
+
+<div id="terminal-container">
+    <div id="terminal-content">
+        <div class="line system">Architect Engine Loaded.</div>
+        <div class="line system">Try 'coa', 'coa add', or 'man coa'.</div>
+    </div>
+</div>
+
+<div id="input-wrapper">
+    <div id="suggestions-container">
+        <div id="context-badge" class="hidden" onmousedown="event.preventDefault()" onclick="cycleContext()"></div>
+        <div id="suggestions"></div>
+    </div>
+    <div class="input-stack">
+        <span class="prompt" id="prompt-char">$</span>
+        <div id="ghost-text"></div>
+        <input type="text" id="cmd-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div id="tab-btn" onmousedown="event.preventDefault()" onclick="acceptGhost()">➜</div>
+    </div>
+</div>
+
+<input type="file" id="file-input" style="display:none">
+
+<div id="editor-modal">
+    <div id="editor-toolbar">
+        <button class="btn btn-text" onclick="window.Editor.close()">Cancel</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn btn-icon" onclick="window.Editor.copy()" id="copy-btn">Copy</button>
+            <button class="btn btn-primary" onclick="window.Editor.save()">Save</button>
+        </div>
+    </div>
+    <textarea id="raw-editor" spellcheck="false"></textarea>
+</div>
+
+<script>
+/* =========================================
+   MANUAL PAGES
+   ========================================= */
+const MAN_PAGES = {
+    'coa': `<div class="man-title">coa</div><div>Chart of Accounts Manager.</div><div class="man-sect">Usage</div><span class="man-code">coa</span> (View tree)<br><span class="man-code">coa add &lt;name&gt;</span> (Create account)<br><span class="man-code">coa list</span> (Flat list)<br><span class="man-code">coa &lt;filter&gt;</span> (Filter tree) <div class="man-sect">Details</div><div>Use <b>add</b> to explicitly define accounts, which is required for Strict Mode.</div>`,
+    'add': `<div class="man-title">add</div><div>Transaction Wizard.</div>`,
+    'strict': `<div class="man-title">strict</div><div>Toggle Strict Mode.</div><div>When ON, only accounts defined via 'coa add' or 'account' directives are allowed in transactions.</div>`,
+    'bs': `<div class="man-title">bs</div><div>Balance Sheet.</div>`,
+    'check': `<div class="man-title">check</div><div>Integrity Check.</div>`
+};
+
+/* =========================================
+   CORE UTILS
+   ========================================= */
+const MathEngine = {
+    eval(str) {
+        if (!str || /^\d{4}-\d{1,2}/.test(str) || !/[\+\-\*\/]/.test(str) || !/^[\d\.\+\-\*\/\(\)\s]+$/.test(str)) return null;
+        try { const res = new Function('return ' + str)(); if (isFinite(res) && !isNaN(res) && res.toString() !== str.trim()) return res.toFixed(2); } catch(e) {} return null;
+    }
+};
+
+function match(t, q) {
+    if(!q) return true; const s = q.toLowerCase();
+    if (s.startsWith('date:')) return t.date.startsWith(s.substring(5));
+    if (s.startsWith('amt:')) {
+        const cond = s.substring(4);
+        const val = parseFloat(cond.replace(/[><]/,''));
+        if (isNaN(val)) return true;
+        if (cond.startsWith('>')) return t.posts.some(p => Math.abs(p.amt) > val);
+        if (cond.startsWith('<')) return t.posts.some(p => Math.abs(p.amt) < val);
+        return t.posts.some(p => Math.abs(p.amt) === val);
+    }
+    return t.desc.toLowerCase().includes(s) || t.posts.some(p=>p.acc.includes(s));
+}
+
+const SETTINGS = { strictMode: localStorage.getItem('HL_STRICT')==='true', toggleStrict() { this.strictMode = !this.strictMode; localStorage.setItem('HL_STRICT', this.strictMode); updateStrictUI(); return this.strictMode; } };
+function updateStrictUI() { document.getElementById('strict-badge').style.display = SETTINGS.strictMode ? 'inline' : 'none'; } updateStrictUI();
+
+/* =========================================
+   MANAGERS
+   ========================================= */
+const ThemeManager = {
+    init() { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); if(t.preset) this.setPreset(t.preset); if(t.font) this.setFont(t.font); if(t.bg) this.setBg(t.bg); if(t.text) this.setText(t.text); },
+    save(k, v) { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); t[k] = v; localStorage.setItem('HL_THEME_CFG', JSON.stringify(t)); },
+    setPreset(name) { document.documentElement.setAttribute('data-theme', name); this.save('preset', name); },
+    setFont(size) { document.documentElement.style.setProperty('--font-size', size); this.save('font', size); },
+    setBg(color) { document.documentElement.style.setProperty('--bg', color); this.save('bg', color); },
+    setText(color) { document.documentElement.style.setProperty('--text', color); this.save('text', color); },
+    reset() { localStorage.removeItem('HL_THEME_CFG'); document.documentElement.removeAttribute('data-theme'); document.documentElement.style = ''; this.setPreset('default'); }
+}; ThemeManager.init();
+
+const AliasManager = {
+    aliases: JSON.parse(localStorage.getItem('HL_ALIASES')||'{}'),
+    set(key, val) { this.aliases[key] = val; this.save(); },
+    remove(key) { delete this.aliases[key]; this.save(); },
+    resolve(input) { return this.aliases[input] || input; },
+    save() { localStorage.setItem('HL_ALIASES', JSON.stringify(this.aliases)); },
+    list() { return this.aliases; }
+};
+
+const BudgetManager = {
+    budgets: JSON.parse(localStorage.getItem('HL_BUDGETS')||'{}'),
+    set(cat, amt) { this.budgets[cat] = parseFloat(amt); this.save(); },
+    remove(cat) { delete this.budgets[cat]; this.save(); },
+    get() { return this.budgets; },
+    save() { localStorage.setItem('HL_BUDGETS', JSON.stringify(this.budgets)); }
+};
+
+const LedgerManager = {
+    current: localStorage.getItem('HL_META')||'default',
+    list: () => Object.keys(localStorage).filter(k=>k.startsWith('HL_DATA_')).map(k=>k.replace('HL_DATA_','')),
+    load() {
+        let data = localStorage.getItem('HL_DATA_' + this.current);
+        if (!data) { data = "; hledger init\n2023-01-01 opening\n    assets:bank  $1000\n    equity:open\n"; localStorage.setItem('HL_DATA_' + this.current, data); }
+        parseData(data); document.getElementById('ledger-badge').innerText = this.current;
+    },
+    switch(n) { this.current = n.toLowerCase(); localStorage.setItem('HL_META', this.current); this.load(); },
+    save(d) { localStorage.setItem('HL_DATA_' + this.current, d); },
+    getRaw() { return localStorage.getItem('HL_DATA_' + this.current); },
+    append(text) { this.save(this.getRaw() + "\n" + text); this.load(); },
+    delete(index) {
+        const txns = [...transactions]; if (index < 0 || index >= txns.length) return false;
+        txns.splice(index, 1); 
+        // Reconstruct including directives
+        const oldRaw = this.getRaw();
+        const directives = oldRaw.split('\n').filter(l => l.startsWith('account ') || l.startsWith('alias ') || l.startsWith(';'));
+        let out = directives.join('\n') + "\n";
+        txns.forEach(t => { out += `\n${t.date} ${t.desc}\n`; t.posts.forEach(p => { out += `    ${p.acc}    ${p.amt}\n`; }); });
+        this.save(out); this.load(); return true;
+    }
+};
+
+/* =========================================
+   PARSER
+   ========================================= */
+let transactions = [];
+let definedAccounts = new Set(); // Explicitly defined via 'account'
+
+function parseData(source) {
+    transactions = []; 
+    const accSet = new Set();
+    definedAccounts = new Set(); // Reset
+    
+    const lines = source.split('\n'); 
+    let txn = null;
+    
+    lines.forEach(line => {
+        const clean = line.split(';')[0].trimEnd(); 
+        if (!clean) return;
+        
+        // Account Directive
+        if (clean.startsWith('account ')) {
+            const accName = clean.substring(8).trim();
+            definedAccounts.add(accName);
+            accSet.add(accName);
+            return;
+        }
+
+        const dMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})\s+(.*)$/);
+        const pMatch = clean.match(/^\s+([\w:]+)(?:\s{2,}(.*))?$/);
+        
+        if (dMatch) { 
+            if (txn) transactions.push(finalize(txn, transactions.length)); 
+            txn = { id: transactions.length, date: dMatch[1], desc: dMatch[2], posts: [] }; 
+        } 
+        else if (pMatch && txn) { 
+            const acc = pMatch[1].toLowerCase(); 
+            accSet.add(acc); 
+            txn.posts.push({ acc: acc, amtRaw: pMatch[2] }); 
+        }
+    });
+    if (txn) transactions.push(finalize(txn, transactions.length)); 
+    ENGINE.accounts = Array.from(accSet).sort(); 
+}
+function finalize(txn, id) {
+    let bal = 0, nullPost = null; txn.id = id;
+    txn.posts.forEach(p => { 
+        p.amt = 0; 
+        if(!p.amtRaw) { nullPost=p; } else {
+            if (p.amtRaw.split('-').length > 2) { p.amt = 0; } else {
+                const clean = p.amtRaw.replace(/[^\d.-]/g,'');
+                if (!isNaN(parseFloat(clean))) p.amt = parseFloat(clean);
+            }
+            bal += p.amt; 
+        }
+    });
+    if(nullPost) nullPost.amt = -bal;
+    return txn;
+}
+
+/* =========================================
+   AI ENGINE
+   ========================================= */
+const ENGINE = {
+    schema: {
+        'coa': { type: 'branch', branches: { 'add': {type:'hint',text:'<name>'}, 'list':{type:'info',text:'flat list'} }, dynamic: () => ['<filter>'] },
+        'bs': { type: 'info', text: 'balance sheet' },
+        'check': { type: 'info', text: 'integrity check' },
+        'man': { type: 'enum', options: () => Object.keys(MAN_PAGES) },
+        'dash': { type: 'info', text: 'show dashboard' },
+        'edit': { type: 'info', text: 'open raw editor' },
+        'undo': { type: 'info', text: 'revert last txn' },
+        'stats': { type: 'info', text: 'file metrics' },
+        'strict': { type: 'info', text: 'toggle validation' },
+        'clear': { type: 'info', text: 'clear screen' },
+        'help': { type: 'info', text: 'show command list' },
+        'forecast': { type: 'info', text: 'project balance' },
+        'import': { type: 'branch', branches: { 'replace': {type:'info',text:'overwrite'}, 'append': {type:'info',text:'add'} } },
+        'export': { type: 'branch', branches: { 'copy': {type:'info',text:'to clipboard'}, 'file': {type:'info',text:'download'} } },
+        'budget': {
