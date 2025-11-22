@@ -44,8 +44,8 @@
         }
         #status-right { display: flex; gap: 10px; align-items: center; }
         #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
-        #install-btn { color: var(--primary); display: none; font-weight: bold; border: 1px solid var(--primary); padding: 0 6px; border-radius: 3px; cursor: pointer; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
+        #install-btn { color: var(--bg); background: var(--primary); display: none; font-weight: bold; border: 1px solid var(--primary); padding: 2px 8px; border-radius: 3px; cursor: pointer; animation: pulse 2s infinite; box-shadow: 0 0 10px var(--primary); }
+        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
         #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
 
         #terminal-container { 
@@ -60,6 +60,7 @@
         .line.system { color: var(--accent); font-style: italic; }
         .line.error { color: var(--error); }
         .line.success { color: var(--success); }
+        .line.debug { color: #ff00ff; font-size: 0.8em; }
 
         /* Tree Visualization */
         .tree-container { margin-top: 8px; border-left: 1px solid var(--accent); padding-left: 4px; }
@@ -115,6 +116,18 @@
         .btn-icon { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
         body.wizard-mode .prompt { color: var(--warn); }
     </style>
+    <script>
+        // PWA INIT - MUST BE FIRST
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('install-btn');
+                if(btn) { btn.style.display = 'inline'; btn.innerText = 'INSTALL APP'; }
+            });
+        });
+    </script>
 </head>
 <body>
 
@@ -164,47 +177,46 @@
 /* =========================================
    PWA & SERVICE WORKER LOGIC
    ========================================= */
-let deferredPrompt;
-const installBtn = document.getElementById('install-btn');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = 'inline';
-});
-
 async function installApp() {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+        alert("Browser install blocked. \n\n1. Ensure you are on HTTPS or Localhost (not file://).\n2. If on iOS: Tap Share -> Add to Home Screen.");
+        return;
+    }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-        installBtn.style.display = 'none';
+        document.getElementById('install-btn').style.display = 'none';
     }
     deferredPrompt = null;
 }
 
-if ('serviceWorker' in navigator) {
-    // Dynamic Service Worker to allow Single-File Offline PWA
-    const swContent = `
-    const CACHE_NAME = 'hcli-v22-offline';
-    self.addEventListener('install', (e) => {
-        self.skipWaiting();
-        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.add(location.href)));
-    });
-    self.addEventListener('activate', (e) => {
-        e.waitUntil(clients.claim());
-    });
-    self.addEventListener('fetch', (e) => {
-        e.respondWith(
-            caches.match(e.request).then(res => res || fetch(e.request))
-        );
-    });
-    `;
-    const blob = new Blob([swContent], {type: 'text/javascript'});
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl)
-        .then(() => console.log('SW Registered'))
-        .catch(err => console.log('SW Failed (Requires HTTPS or Localhost):', err));
+// Protocol Check
+if (window.location.protocol === 'file:') {
+    setTimeout(() => log("WARNING: Install disabled on file:// protocol. Please use a local server (http://localhost) or HTTPS to install.", 'error'), 500);
+} else {
+    // Register SW
+    if ('serviceWorker' in navigator) {
+        const swContent = `
+        const CACHE_NAME = 'hcli-v22-offline';
+        self.addEventListener('install', (e) => { self.skipWaiting(); });
+        self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+        self.addEventListener('fetch', (e) => {
+            e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+        });`;
+        
+        const blob = new Blob([swContent], {type: 'text/javascript'});
+        const swUrl = URL.createObjectURL(blob);
+        
+        navigator.serviceWorker.register(swUrl)
+            .then(reg => {
+                // log("SW Registered: Ready for Install", 'debug');
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (isIOS && !window.navigator.standalone) {
+                    setTimeout(() => log("iOS: Tap Share -> 'Add to Home Screen' to install.", 'system'), 1000);
+                }
+            })
+            .catch(err => log("SW Error: " + err, 'debug'));
+    }
 }
 
 /* =========================================
