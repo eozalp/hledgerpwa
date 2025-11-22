@@ -4,18 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Hledger V22</title>
-    <meta name="theme-color" content="#0f172a">
-    <meta name="description" content="Offline CLI Accounting Tool">
     
-    <!-- iOS Support -->
+    <!-- 1. EMBEDDED MANIFEST (Base64 Encoded JSON) -->
+    <!-- This defines the app name, colors, and display mode without needing an external file -->
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhsZWRnZXIgVjIyIiwKICAic2hvcnRfbmFtZSI6ICJITGVkZ2VyIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjE3MmEiLAogICJ0aGVtZV9jb2xvciI6ICIjMGYxNzJhIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNRiY3B6ZEhWamFEd3hNREF3TVRnd01DQlRaV2Q4WDI1bIyNDhMM1JoY201emRHRnNaUzVoYldVOUlqeHdZWFJvT2lBOUlqQWdNQ0ExTVRJeE1USWlQajxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMGYxNzJhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGR5PSIuM2VtIiBmaWxsPSIjMzhiZGY4IiBmb250LXNpemU9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC13ZWlnaHQ9ImJvbGQiPiZndDtfPC90ZXh0Pjwvc3ZnPg==",\n      "sizes": "512x512",\n      "type": "image/svg+xml"\n    }\n  ]\n}">
+
+    <!-- 2. META TAGS FOR IOS/ANDROID -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Hledger">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E">
 
-    <!-- PWA Manifest -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Hledger V22","short_name":"HCLI","start_url":".","id":"/hledger-v22","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"portrait","scope":".","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
-    
+    <!-- 3. EMBEDDED ICONS (Base64 SVG) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
+
     <style>
         :root {
             --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0;
@@ -23,6 +27,7 @@
             --warn: #fbbf24; --error: #f87171; --success: #4ade80;
             --font: 'Menlo', 'Consolas', 'Fira Code', monospace;
             --font-size: 13px;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
         }
         [data-theme="matrix"] { --bg:#000; --panel:#0a0a0a; --text:#0f0; --primary:#0f0; --accent:#008f11; --ghost:#003300; --error:#f00; }
         [data-theme="dracula"] { --bg:#282a36; --panel:#44475a; --text:#f8f8f2; --primary:#ff79c6; --accent:#6272a4; --ghost:#6272a4; }
@@ -37,15 +42,23 @@
         }
 
         #status-bar { 
-            padding: 8px 1rem; font-size: 11px; 
+            padding: 8px 1rem; padding-top: env(safe-area-inset-top, 8px); font-size: 11px; 
             background: var(--panel); color: var(--accent); 
             display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid var(--accent); flex-shrink: 0; 
+            border-bottom: 1px solid var(--accent); flex-shrink: 0; height: calc(40px + env(safe-area-inset-top, 0));
         }
         #status-right { display: flex; gap: 10px; align-items: center; }
         #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
-        #install-btn { color: var(--bg); background: var(--primary); display: none; font-weight: bold; border: 1px solid var(--primary); padding: 2px 8px; border-radius: 3px; cursor: pointer; animation: pulse 2s infinite; box-shadow: 0 0 10px var(--primary); }
+        
+        /* PWA Install Button */
+        #install-btn { 
+            color: var(--bg); background: var(--primary); 
+            display: none; font-weight: bold; border: 1px solid var(--primary); 
+            padding: 2px 8px; border-radius: 3px; cursor: pointer; 
+            animation: pulse 2s infinite;
+        }
         @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
+
         #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
 
         #terminal-container { 
@@ -60,7 +73,6 @@
         .line.system { color: var(--accent); font-style: italic; }
         .line.error { color: var(--error); }
         .line.success { color: var(--success); }
-        .line.debug { color: #ff00ff; font-size: 0.8em; }
 
         /* Tree Visualization */
         .tree-container { margin-top: 8px; border-left: 1px solid var(--accent); padding-left: 4px; }
@@ -88,7 +100,7 @@
         .txn-id { color: var(--accent); font-size: 10px; margin-right: 8px; opacity: 0.7; }
 
         /* Input */
-        #input-wrapper { background: var(--panel); padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
+        #input-wrapper { background: var(--panel); padding: 8px; padding-bottom: max(8px, var(--safe-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
         #suggestions-container { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; height: 30px; }
         #context-badge { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); padding: 0 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: bold; min-width: 45px; text-align: center; height: 26px; display: flex; align-items: center; justify-content: center; }
         #context-badge:active { background: var(--accent); color: var(--bg); }
@@ -108,7 +120,7 @@
 
         #editor-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
         #editor-modal.open { transform: translateY(0); }
-        #editor-toolbar { padding: 1rem; background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        #editor-toolbar { padding: 1rem; padding-top: max(1rem, env(safe-area-inset-top)); background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
         #raw-editor { flex: 1; background: var(--bg); color: var(--text); border: none; padding: 1rem; font-family: var(--font); font-size: 14px; resize: none; outline: none; white-space: pre; }
         .btn { padding: 6px 12px; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; }
         .btn-primary { background: var(--primary); color: var(--bg); }
@@ -116,18 +128,6 @@
         .btn-icon { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
         body.wizard-mode .prompt { color: var(--warn); }
     </style>
-    <script>
-        // PWA INIT - MUST BE FIRST
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('install-btn');
-                if(btn) { btn.style.display = 'inline'; btn.innerText = 'INSTALL APP'; }
-            });
-        });
-    </script>
 </head>
 <body>
 
@@ -175,48 +175,63 @@
 
 <script>
 /* =========================================
-   PWA & SERVICE WORKER LOGIC
+   4. SERVICE WORKER INJECTION (The "Esnaf" Method)
    ========================================= */
-async function installApp() {
-    if (!deferredPrompt) {
-        alert("Browser install blocked. \n\n1. Ensure you are on HTTPS or Localhost (not file://).\n2. If on iOS: Tap Share -> Add to Home Screen.");
-        return;
+window.onload = () => {
+    // 4.1 Dynamic Service Worker for Single File Offline Capability
+    if('serviceWorker' in navigator){
+        // This code forces the browser to treat the current file ('.') as a cached asset
+        const swCode = `
+        const CACHE_NAME = 'hledger-v22-offline';
+        self.addEventListener('install', e => { 
+            e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.add('.'))); 
+            self.skipWaiting(); 
+        });
+        self.addEventListener('activate', e => self.clients.claim());
+        self.addEventListener('fetch', e => {
+            e.respondWith(
+                fetch(e.request)
+                .then(res => { 
+                    // Clone and cache updated version on successful fetch
+                    const c = res.clone(); 
+                    caches.open(CACHE_NAME).then(cache => cache.put(e.request, c)); 
+                    return res; 
+                })
+                .catch(() => caches.match(e.request)) // Fallback to cache if offline
+            );
+        });`;
+        
+        // Create Blob from string and register
+        const blob = new Blob([swCode], {type: 'text/javascript'});
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl)
+            .then(() => console.log('SW Registered'))
+            .catch(err => console.log('SW Error:', err));
     }
+    
+    LedgerManager.load();
+    run('dash');
+    updatePrediction();
+};
+
+/* =========================================
+   PWA INSTALL UI LOGIC
+   ========================================= */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-btn').style.display = 'inline';
+});
+
+async function installApp() {
+    if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
         document.getElementById('install-btn').style.display = 'none';
     }
     deferredPrompt = null;
-}
-
-// Protocol Check
-if (window.location.protocol === 'file:') {
-    setTimeout(() => log("WARNING: Install disabled on file:// protocol. Please use a local server (http://localhost) or HTTPS to install.", 'error'), 500);
-} else {
-    // Register SW
-    if ('serviceWorker' in navigator) {
-        const swContent = `
-        const CACHE_NAME = 'hcli-v22-offline';
-        self.addEventListener('install', (e) => { self.skipWaiting(); });
-        self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
-        self.addEventListener('fetch', (e) => {
-            e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-        });`;
-        
-        const blob = new Blob([swContent], {type: 'text/javascript'});
-        const swUrl = URL.createObjectURL(blob);
-        
-        navigator.serviceWorker.register(swUrl)
-            .then(reg => {
-                // log("SW Registered: Ready for Install", 'debug');
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                if (isIOS && !window.navigator.standalone) {
-                    setTimeout(() => log("iOS: Tap Share -> 'Add to Home Screen' to install.", 'system'), 1000);
-                }
-            })
-            .catch(err => log("SW Error: " + err, 'debug'));
-    }
 }
 
 /* =========================================
@@ -826,10 +841,6 @@ window.Editor = {
 input.addEventListener('input', updatePrediction);
 input.addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key === 'ArrowRight') { e.preventDefault(); acceptGhost(); } if (e.key === 'Enter') { run(input.value); input.value = ''; updatePrediction(); } });
 if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}); container.scrollTop = container.scrollHeight; }); }
-
-LedgerManager.load();
-run('dash');
-updatePrediction();
 </script>
 </body>
 </html>
