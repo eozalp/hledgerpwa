@@ -3,9 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-    <title>Hledger V22 COA</title>
+    <title>Hledger V22</title>
     <meta name="theme-color" content="#0f172a">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Hledger V22","short_name":"HCLI","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
+    <meta name="description" content="Offline CLI Accounting Tool">
+    
+    <!-- iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hledger">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Hledger V22","short_name":"HCLI","start_url":".","id":"/hledger-v22","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"portrait","scope":".","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 fill=%22%230f172a%22/%3E%3Cpath d=%22M64 96h384v320H64z%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%2232%22/%3E%3Cpath d=%22M128 256h256M128 192h256M128 320h256%22 stroke=%22%2338bdf8%22 stroke-width=%2216%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
     
     <style>
         :root {
@@ -35,6 +44,8 @@
         }
         #status-right { display: flex; gap: 10px; align-items: center; }
         #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
+        #install-btn { color: var(--primary); display: none; font-weight: bold; border: 1px solid var(--primary); padding: 0 6px; border-radius: 3px; cursor: pointer; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
         #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
 
         #terminal-container { 
@@ -56,7 +67,7 @@
         .tree-marker { color: var(--accent); margin-right: 6px; font-family: monospace; }
         .tree-name { color: var(--text); cursor: pointer; transition: color 0.2s; }
         .tree-name:hover { color: var(--primary); text-decoration: underline; }
-        .tree-name.explicit { font-weight: bold; color: var(--primary); } /* Explicitly defined accounts */
+        .tree-name.explicit { font-weight: bold; color: var(--primary); } 
 
         /* Reports & Dash */
         .pnl-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--panel); }
@@ -110,6 +121,7 @@
 <div id="status-bar">
     <span>HLEDGER V22</span>
     <div id="status-right">
+        <span id="install-btn" onclick="installApp()">INSTALL</span>
         <span id="strict-badge">STRICT</span>
         <span id="ledger-badge">default</span>
     </div>
@@ -149,6 +161,52 @@
 </div>
 
 <script>
+/* =========================================
+   PWA & SERVICE WORKER LOGIC
+   ========================================= */
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'inline';
+});
+
+async function installApp() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+        installBtn.style.display = 'none';
+    }
+    deferredPrompt = null;
+}
+
+if ('serviceWorker' in navigator) {
+    // Dynamic Service Worker to allow Single-File Offline PWA
+    const swContent = `
+    const CACHE_NAME = 'hcli-v22-offline';
+    self.addEventListener('install', (e) => {
+        self.skipWaiting();
+        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.add(location.href)));
+    });
+    self.addEventListener('activate', (e) => {
+        e.waitUntil(clients.claim());
+    });
+    self.addEventListener('fetch', (e) => {
+        e.respondWith(
+            caches.match(e.request).then(res => res || fetch(e.request))
+        );
+    });
+    `;
+    const blob = new Blob([swContent], {type: 'text/javascript'});
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl)
+        .then(() => console.log('SW Registered'))
+        .catch(err => console.log('SW Failed (Requires HTTPS or Localhost):', err));
+}
+
 /* =========================================
    MANUAL PAGES
    ========================================= */
@@ -744,7 +802,7 @@ window.acceptGhost = function() { if (ghostSuffix) { input.value += ghostSuffix;
 window.completeChip = (text) => { const val = input.value; const parts = val.split(' '); if (val.endsWith(' ')) input.value += text; else { parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + text; } if (!text.endsWith(':')) input.value += ' '; input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
 window.fill = (s) => { if (wizard) { input.value = s; } else { input.value += s + ' '; } input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
 
-// GLOBAL EXPORT - CRITICAL
+// GLOBAL EXPORT
 window.Editor = {
     el: document.getElementById('editor-modal'), area: document.getElementById('raw-editor'),
     open() { this.area.value = LedgerManager.getRaw(); this.el.classList.add('open'); setTimeout(()=>this.area.focus(), 300); },
