@@ -1,35 +1,45 @@
+<!-- 
+================================================================================
+APPLICATION IDENTITY:
+  - Name: Hledger V23.41 (Fortress Patch)
+  - Type: Single-File HTML5 PWA
+  - Architecture: Titanium Graph Engine V3.3
+
+CHANGELOG V23.41:
+  1. CRITICAL: Transactional Parsing.
+     - Parsing now happens in a sandbox. If a file contains errors, 
+       the app rolls back to the last good state instead of crashing/wiping data.
+  2. FIX: Safe Undo.
+     - Undo no longer relies on text splitting. It removes the last 
+       entry logically, preventing accidental mass deletion of compact files.
+  3. SAFETY: Storage Guard.
+     - Catches 'QuotaExceededError' if LocalStorage is full.
+     - Prevents overwriting files with empty data strings.
+  4. LOGIC: Optional Description & Math (Inherited from V23.40).
+================================================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-    <title>Hledger V22</title>
-    <meta name="description" content="Offline CLI Accounting Tool">
-    
-    <!-- 1. PWA MANIFEST (Fixed Base64 encoding) -->
-    <!-- Contains: Name, Start URL, Display: Standalone, and the SVG Icon -->
-    <link rel="manifest" href="data:application/json;base64,eyJkZXNjcmlwdGlvbiI6Ik9mZmxpbmUgQ0xJIEFjY291bnRpbmciLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImljb25zIjpbeyJzaXplcyI6IjUxMng1MTIiLCJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTVMTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQtiM2c5SWpBZ01DQTFNVEl4TlRJaVBqeHlaV04wSUhkcGRHZG9QU0kxTVRJaUlHaGxhV2RvZEQwaU5URXlJaVptYVd4c1BTWXI1QnZQSGhoYm14b2IzSjFZM1F2UGp4MFpYaDBJRGhoT1RvaUlITWxZWFJ5YVc1bklHMXpQU0kzTnpRd01DIiBmaWxsPSIjMzhiZGY4IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjIwMCIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjUwJSIgeT0iNTAlIj4mZ3Q7XzwvdGV4dD48L3N2Zz4iLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCJ9XSwibmFtZSI6IkhsZWRnZXIgVjIyIiwic2hvcnRfbmFtZSI6IkhsZWRnZXIiLCJzdGFydF91cmwiOiIuIiwidGhlbWVfY29xvciIjBmMTcyYSIsImJhY2tncm91bmRfY29sb3IiOiIjMGYxNzJhIn0=">
-
-    <!-- 2. META TAGS -->
+    <title>Hledger V23.41</title>
     <meta name="theme-color" content="#0f172a">
-    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Hledger">
-
-    <!-- 3. ICONS (Base64) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBmMTcyYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iIzM4YmRmOCIgZm9udC1zaXplPSIyMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtd2VpZ2h0PSJib2xkIj4mZ3Q7XzwvdGV4dD48L3N2Zz4=">
+    
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkhsZWRnZXIgVjIzLjQxIiwKICAic2hvcnRfbmFtZSI6ICJIbGVkZ2VyIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMGYxNzJhIiwKICAidGhlbWVfY29xvciI6ICIjMGYxNzJhIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly92aWEucGxhY2Vob2xkZXIuY29tLzE5MiIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIgogICAgfSwKICAgIHsKICAgICAgInNyYyI6ICJodHRwczovL3ZpYS5wbGFjZWhvbGRlci5jb20vNTEyIiwKICAgICAgInNpemVzIjogIjUxMng1MTIiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciCiAgICB9CiAgXQp9">
 
     <style>
         :root {
             --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0;
             --primary: #38bdf8; --accent: #64748b; --ghost: #475569;
             --warn: #fbbf24; --error: #f87171; --success: #4ade80;
-            --font: 'Menlo', 'Consolas', 'Fira Code', monospace;
+            --font: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
             --font-size: 13px;
-            --safe-bottom: env(safe-area-inset-bottom, 20px);
         }
+        @media (max-width: 600px) { :root { --font-size: 14px; } }
+
         [data-theme="matrix"] { --bg:#000; --panel:#0a0a0a; --text:#0f0; --primary:#0f0; --accent:#008f11; --ghost:#003300; --error:#f00; }
         [data-theme="dracula"] { --bg:#282a36; --panel:#44475a; --text:#f8f8f2; --primary:#ff79c6; --accent:#6272a4; --ghost:#6272a4; }
         [data-theme="paper"] { --bg:#fff; --panel:#f3f4f6; --text:#111; --primary:#000; --accent:#9ca3af; --ghost:#d1d5db; }
@@ -43,114 +53,154 @@
         }
 
         #status-bar { 
-            padding: 8px 1rem; padding-top: env(safe-area-inset-top, 8px); font-size: 11px; 
+            padding: 12px 1rem; font-size: 11px; 
             background: var(--panel); color: var(--accent); 
             display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid var(--accent); flex-shrink: 0; height: calc(40px + env(safe-area-inset-top, 0));
+            border-bottom: 1px solid var(--accent); flex-shrink: 0; 
+            padding-top: max(12px, env(safe-area-inset-top));
         }
         #status-right { display: flex; gap: 10px; align-items: center; }
         #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
-        
-        /* PWA Install Button */
-        #install-btn { 
-            color: var(--bg); background: var(--primary); 
-            display: none; font-weight: bold; border: 1px solid var(--primary); 
-            padding: 2px 8px; border-radius: 3px; cursor: pointer; 
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
-
+        #mount-badge { display: none; font-weight: bold; background: var(--primary); color: var(--bg); padding: 0 4px; border-radius: 3px; }
+        #pwa-badge { display: none; font-weight: bold; background: var(--success); color: var(--bg); padding: 0 4px; border-radius: 3px; }
         #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
 
         #terminal-container { 
             flex: 1; overflow-y: auto; display: flex; flex-direction: column; 
             scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
         }
-        #terminal-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; padding-bottom: 10px; }
+        #terminal-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; padding-bottom: 20px; }
         
-        .line { margin-bottom: 6px; word-break: break-word; font-size: var(--font-size); line-height: 1.5; }
-        .line.cmd { color: var(--accent); margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--panel); opacity: 0.8; }
+        .line { margin-bottom: 8px; word-break: break-word; font-size: var(--font-size); line-height: 1.5; }
+        .line.cmd { color: var(--accent); margin-top: 1.5rem; padding-top: 0.5rem; border-top: 1px solid var(--panel); opacity: 0.8; }
         .line.cmd::before { content: "➜ "; color: var(--primary); }
         .line.system { color: var(--accent); font-style: italic; }
         .line.error { color: var(--error); }
         .line.success { color: var(--success); }
+        .line.warn { color: var(--warn); }
+        .line.dismissible { background: rgba(251, 191, 36, 0.1); padding: 8px; border-left: 2px solid var(--warn); border-radius: 0 4px 4px 0; display: flex; justify-content: space-between; align-items: center; }
+        .dismiss-btn { cursor: pointer; text-decoration: underline; font-weight: bold; font-size: 0.9em; opacity: 0.8; margin-left: 10px; white-space: nowrap; }
+        .dismiss-btn:hover { opacity: 1; }
 
-        /* Tree Visualization */
-        .tree-container { margin-top: 8px; border-left: 1px solid var(--accent); padding-left: 4px; }
-        .tree-item { display: flex; align-items: center; padding: 2px 0; }
-        .tree-marker { color: var(--accent); margin-right: 6px; font-family: monospace; }
-        .tree-name { color: var(--text); cursor: pointer; transition: color 0.2s; }
-        .tree-name:hover { color: var(--primary); text-decoration: underline; }
-        .tree-name.explicit { font-weight: bold; color: var(--primary); } 
+        .help-cat { color: var(--primary); font-weight: bold; margin-top: 12px; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--panel); padding-bottom: 2px; }
+        .help-cmd { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+        .help-cmd span:first-child { color: var(--text); font-weight: 500; }
+        .help-cmd span:last-child { color: var(--accent); opacity: 0.8; font-size: 12px; }
 
-        /* Reports & Dash */
-        .pnl-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--panel); }
-        .pnl-head { font-weight: bold; color: var(--primary); margin-top: 8px; border-bottom: 1px solid var(--accent); padding-bottom: 2px; }
-        .pnl-total { font-weight: bold; border-top: 1px solid var(--text); margin-top: 4px; padding-top: 4px; color: var(--text); }
-        .budget-row { margin-bottom: 8px; }
-        .budget-label { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.8; margin-bottom: 2px; }
-        .budget-track { height: 8px; background: var(--panel); border-radius: 4px; overflow: hidden; }
-        .budget-fill { height: 100%; background: var(--success); transition: width 0.3s; }
-        .budget-fill.warn { background: var(--warn); }
-        .budget-fill.over { background: var(--error); }
-        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .dash-card { background: var(--panel); padding: 10px; border-radius: 6px; border: 1px solid var(--accent); display: flex; flex-direction: column; }
-        .dash-label { font-size: 10px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
-        .dash-val { font-size: 16px; font-weight: bold; color: var(--text); }
-        .dash-row { grid-column: span 2; }
-        .txn-id { color: var(--accent); font-size: 10px; margin-right: 8px; opacity: 0.7; }
+        .tut-block { border-left: 3px solid var(--primary); padding-left: 12px; margin: 12px 0; background: rgba(255,255,255,0.02); padding-top:4px; padding-bottom:4px; }
+        .tut-title { color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .tut-text { margin-bottom: 8px; opacity: 0.9; line-height: 1.6; }
+        .tut-code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-family: var(--font); color: var(--warn); display: inline-block; border: 1px solid var(--accent); font-size: 0.9em; cursor: pointer; }
+        .tut-code:active { background: var(--accent); color: var(--bg); }
+        .man-page { border: 1px solid var(--accent); border-radius: 8px; padding: 12px; background: var(--panel); margin-top: 10px; }
+        .man-head { font-weight: bold; color: var(--primary); font-size: 1.2em; border-bottom: 1px solid var(--accent); padding-bottom: 8px; margin-bottom: 8px; text-transform: uppercase; }
+        .man-sect { color: var(--accent); font-size: 0.8em; text-transform: uppercase; margin-top: 10px; margin-bottom: 4px; letter-spacing: 1px; }
 
-        /* Input */
-        #input-wrapper { background: var(--panel); padding: 8px; padding-bottom: max(8px, var(--safe-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
-        #suggestions-container { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; height: 30px; }
-        #context-badge { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); padding: 0 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: bold; min-width: 45px; text-align: center; height: 26px; display: flex; align-items: center; justify-content: center; }
+        .graph-container { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 12px; margin: 12px 0; position: relative; user-select: none; }
+        .graph-header { font-size: 11px; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; align-items: center; }
+        .graph-legend { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+        .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+        
+        svg { overflow: visible; }
+        svg text { fill: var(--accent); font-size: 10px; font-family: var(--font); }
+        svg .grid-line { stroke: var(--ghost); stroke-opacity: 0.2; stroke-dasharray: 4; }
+        svg .chart-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+        svg .chart-area { stroke: none; fill-opacity: 0.25; }
+        svg .trend-line { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4; opacity: 0.8; }
+        
+        svg .crosshair { stroke: var(--text); stroke-width: 1; stroke-dasharray: 2; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+        svg .hover-dot { stroke-width: 2; r: 5; opacity: 0; pointer-events: none; transition: opacity 0.1s; fill: var(--bg); stroke: var(--primary); }
+        
+        #graph-tooltip {
+            position: fixed; pointer-events: none; background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--accent); color: var(--text); padding: 8px;
+            border-radius: 6px; font-size: 11px; z-index: 9999; opacity: 0;
+            transition: opacity 0.1s; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px); min-width: 120px;
+        }
+        #graph-tooltip .tt-head { border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 4px; padding-bottom: 4px; font-weight: bold; color: var(--primary); }
+        #graph-tooltip .tt-row { display: flex; justify-content: space-between; margin-bottom: 2px; gap: 15px; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 10px; }
+        .data-table th { text-align: left; border-bottom: 1px solid var(--accent); color: var(--accent); font-weight: normal; padding: 6px 4px; font-size: 0.8em; text-transform: uppercase; }
+        .data-table td { padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table .num { text-align: right; font-family: var(--font); }
+        
+        #input-wrapper { background: var(--panel); padding: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
+        #suggestions-container { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; height: 34px; }
+        #context-badge { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); padding: 0 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: bold; min-width: 50px; text-align: center; height: 32px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         #context-badge:active { background: var(--accent); color: var(--bg); }
-        #context-badge.hidden { display: none; }
-        #suggestions { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; height: 100%; align-items: center; }
-        .chip { background: var(--bg); color: var(--text); padding: 0 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; border: 1px solid var(--accent); cursor: pointer; opacity: 0.9; text-transform: lowercase; transition: background 0.2s; height: 26px; display: flex; align-items: center; }
+        
+        #suggestions { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; height: 100%; align-items: center; -webkit-overflow-scrolling: touch; }
+        .chip { background: var(--bg); color: var(--text); padding: 0 12px; border-radius: 6px; font-size: 13px; white-space: nowrap; border: 1px solid var(--accent); cursor: pointer; opacity: 0.9; text-transform: lowercase; transition: background 0.2s; height: 32px; display: flex; align-items: center; user-select: none; }
         .chip:active { background: var(--primary); color: var(--bg); }
-        .chip.hint { border: 1px dashed var(--accent); opacity: 0.6; cursor: default; font-style: italic; }
+        .chip.hint { border: 1px dashed var(--accent); opacity: 0.8; font-style: italic; }
         .chip.math { border: 1px solid var(--success); color: var(--success); font-weight: bold; background: rgba(74, 222, 128, 0.1); }
-        .input-stack { position: relative; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 0 8px 0 12px; height: 44px; }
-        .prompt { color: var(--primary); font-weight: bold; margin-right: 8px; white-space: pre; }
+        .chip i { font-style: normal; opacity: 0.5; margin-right: 6px; font-size: 10px; text-transform: uppercase; }
+
+        .input-stack { position: relative; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 0 8px 0 12px; height: 48px; }
+        .prompt { color: var(--primary); font-weight: bold; margin-right: 8px; white-space: pre; font-size: 16px; }
+        body.confirm-mode .prompt { color: var(--warn); }
         #cmd-input, #ghost-text { font-family: var(--font); font-size: 16px; position: absolute; left: 30px; right: 50px; top: 0; bottom: 0; background: transparent; border: none; outline: none; display: flex; align-items: center; padding: 0; margin: 0; text-transform: lowercase; }
         #cmd-input { z-index: 2; color: var(--text); width: calc(100% - 80px); }
         #ghost-text { z-index: 1; color: var(--ghost); pointer-events: none; white-space: pre; overflow: hidden; }
-        #tab-btn { position: absolute; right: 4px; z-index: 10; background: var(--panel); color: var(--primary); border: 1px solid var(--accent); border-radius: 4px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        #tab-btn { position: absolute; right: 4px; z-index: 10; background: var(--panel); color: var(--primary); border: 1px solid var(--accent); border-radius: 6px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; font-size: 18px; }
         #tab-btn.visible { opacity: 1; pointer-events: auto; }
 
         #editor-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
         #editor-modal.open { transform: translateY(0); }
-        #editor-toolbar { padding: 1rem; padding-top: max(1rem, env(safe-area-inset-top)); background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
-        #raw-editor { flex: 1; background: var(--bg); color: var(--text); border: none; padding: 1rem; font-family: var(--font); font-size: 14px; resize: none; outline: none; white-space: pre; }
-        .btn { padding: 6px 12px; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; }
+        #editor-toolbar { padding: 1rem; background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; padding-top: max(1rem, env(safe-area-inset-top)); }
+        #raw-editor { flex: 1; background: var(--bg); color: var(--text); border: none; padding: 1rem; font-family: var(--font); font-size: 14px; resize: none; outline: none; white-space: pre; padding-bottom: 40vh; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; }
         .btn-primary { background: var(--primary); color: var(--bg); }
         .btn-text { background: transparent; color: var(--error); }
-        .btn-icon { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
         body.wizard-mode .prompt { color: var(--warn); }
+        
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .dash-card { background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--accent); display: flex; flex-direction: column; }
+        .dash-label { font-size: 11px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+        .dash-val { font-size: 18px; font-weight: bold; color: var(--text); }
+        
+        .draft-box { border: 1px dashed var(--accent); padding: 10px; margin: 10px 0; border-radius: 6px; background: rgba(255,255,255,0.05); }
+        .draft-head { font-weight: bold; color: var(--primary); margin-bottom: 6px; }
+        .draft-row { display: flex; justify-content: space-between; padding-left: 10px; font-size: 0.9em; margin-bottom: 4px; }
+        
+        .pnl-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--panel); }
+        .pnl-head { font-weight: bold; color: var(--primary); margin-top: 12px; border-bottom: 1px solid var(--accent); padding-bottom: 4px; }
+        .pnl-total { font-weight: bold; border-top: 1px solid var(--text); margin-top: 6px; padding-top: 6px; color: var(--text); }
+        
+        .budget-row { margin-bottom: 10px; }
+        .budget-label { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.8; margin-bottom: 4px; }
+        .budget-track { height: 10px; background: var(--panel); border-radius: 5px; overflow: hidden; }
+        .budget-fill { height: 100%; background: var(--success); transition: width 0.3s; }
+        .budget-fill.warn { background: var(--warn); }
+        .budget-fill.over { background: var(--error); }
     </style>
 </head>
 <body>
 
 <div id="status-bar">
-    <span>HLEDGER V22</span>
+    <span>HLEDGER V23.41</span>
     <div id="status-right">
-        <span id="install-btn" onclick="installApp()">INSTALL</span>
+        <span id="pwa-badge">OFFLINE READY</span>
+        <span id="mount-badge">MOUNTED</span>
         <span id="strict-badge">STRICT</span>
         <span id="ledger-badge">default</span>
     </div>
 </div>
 
-<div id="terminal-container">
+<div id="terminal-container" ondblclick="input.blur()">
     <div id="terminal-content">
-        <div class="line system">Architect Engine Loaded.</div>
-        <div class="line system">Try 'coa', 'coa add', or 'man coa'.</div>
+        <div class="line system">Titanium Graph Engine Online.</div>
+        <div class="line system">Type 'tutorial' to open the knowledge base.</div>
     </div>
 </div>
 
 <div id="input-wrapper">
     <div id="suggestions-container">
-        <div id="context-badge" class="hidden" onmousedown="event.preventDefault()" onclick="cycleContext()"></div>
+        <div id="context-badge" onmousedown="event.preventDefault()" onclick="cycleContext()">READY</div>
         <div id="suggestions"></div>
     </div>
     <div class="input-stack">
@@ -161,112 +211,193 @@
     </div>
 </div>
 
+<div id="graph-tooltip"></div>
 <input type="file" id="file-input" style="display:none">
 
 <div id="editor-modal">
     <div id="editor-toolbar">
-        <button class="btn btn-text" onclick="window.Editor.close()">Cancel</button>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <button class="btn btn-icon" onclick="window.Editor.copy()" id="copy-btn">Copy</button>
-            <button class="btn btn-primary" onclick="window.Editor.save()">Save</button>
-        </div>
+        <button class="btn btn-text" onclick="Editor.close()">Cancel</button>
+        <span id="editor-title" style="font-weight:bold; color:var(--text)">RAW EDITOR</span>
+        <button class="btn btn-primary" onclick="Editor.save()">Save</button>
     </div>
     <textarea id="raw-editor" spellcheck="false"></textarea>
 </div>
 
 <script>
 /* =========================================
-   4. SERVICE WORKER INJECTION (Single File Workaround)
-   ========================================= */
-window.onload = () => {
-    if('serviceWorker' in navigator){
-        // We create a Blob Service Worker to satisfy PWA installation criteria.
-        // Note: Chrome may limit Blob SW capabilities, but this triggers the Install Prompt.
-        const swCode = `
-        self.addEventListener('install', e => { self.skipWaiting(); });
-        self.addEventListener('activate', e => {
-            self.clients.claim();
-            console.log('Hledger Single-File SW Active');
-        });
-        self.addEventListener('fetch', e => { return; });
-        `;
-        
-        try {
-            const blob = new Blob([swCode], {type: 'text/javascript'});
-            const blobUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(blobUrl)
-                .then(() => console.log('SW Registered'))
-                .catch(err => console.log('SW Blocked (Expected in some contexts):', err));
-        } catch(e) { console.log('SW Setup Failed'); }
-    }
-    
-    LedgerManager.load();
-    run('dash');
-    updatePrediction();
-};
-
-/* =========================================
-   PWA INSTALL UI LOGIC
-   ========================================= */
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const btn = document.getElementById('install-btn');
-    if(btn) btn.style.display = 'inline';
-});
-
-async function installApp() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-        document.getElementById('install-btn').style.display = 'none';
-    }
-    deferredPrompt = null;
-}
-
-/* =========================================
-   MANUAL PAGES
-   ========================================= */
-const MAN_PAGES = {
-    'coa': `<div class="man-title">coa</div><div>Chart of Accounts Manager.</div><div class="man-sect">Usage</div><span class="man-code">coa</span> (View tree)<br><span class="man-code">coa add &lt;name&gt;</span> (Create account)<br><span class="man-code">coa list</span> (Flat list)<br><span class="man-code">coa &lt;filter&gt;</span> (Filter tree) <div class="man-sect">Details</div><div>Use <b>add</b> to explicitly define accounts, which is required for Strict Mode.</div>`,
-    'add': `<div class="man-title">add</div><div>Transaction Wizard.</div>`,
-    'strict': `<div class="man-title">strict</div><div>Toggle Strict Mode.</div><div>When ON, only accounts defined via 'coa add' or 'account' directives are allowed in transactions.</div>`,
-    'bs': `<div class="man-title">bs</div><div>Balance Sheet.</div>`,
-    'check': `<div class="man-title">check</div><div>Integrity Check.</div>`
-};
-
-/* =========================================
    CORE UTILS
    ========================================= */
+const fmtNum = (n) => (Math.abs(n % 1) < 1e-8) ? n.toFixed(2) : n.toString();
+const escapeHtml = (unsafe) => unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
 const MathEngine = {
     eval(str) {
-        if (!str || /^\d{4}-\d{1,2}/.test(str) || !/[\+\-\*\/]/.test(str) || !/^[\d\.\+\-\*\/\(\)\s]+$/.test(str)) return null;
-        try { const res = new Function('return ' + str)(); if (isFinite(res) && !isNaN(res) && res.toString() !== str.trim()) return res.toFixed(2); } catch(e) {} return null;
+        if (!str || /^\d{4}-\d{1,2}/.test(str) || !/[\+\-\*\/]/.test(str) || !/^[\[\d\.\+\-\*\/\(\)\s]+$/.test(str)) return null;
+        try { const res = new Function('return ' + str)(); if (isFinite(res) && !isNaN(res) && res.toString() !== str.trim()) return fmtNum(res); } catch(e) {} return null;
+    },
+    linearRegression(data) {
+        const n = data.length; if (n < 2) return null;
+        let sumX=0, sumY=0, sumXY=0, sumXX=0;
+        for (let i=0; i<n; i++) { sumX += i; sumY += data[i].y; sumXY += (i*data[i].y); sumXX += (i*i); }
+        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        return data.map((d, i) => ({ x: d.x, y: slope * i + intercept }));
     }
 };
 
+/* =========================================
+   ADVANCED QUERY ENGINE
+   ========================================= */
 function match(t, q) {
-    if(!q) return true; const s = q.toLowerCase();
-    if (s.startsWith('date:')) return t.date.startsWith(s.substring(5));
-    if (s.startsWith('amt:')) {
-        const cond = s.substring(4);
-        const val = parseFloat(cond.replace(/[><]/,''));
-        if (isNaN(val)) return true;
-        if (cond.startsWith('>')) return t.posts.some(p => Math.abs(p.amt) > val);
-        if (cond.startsWith('<')) return t.posts.some(p => Math.abs(p.amt) < val);
-        return t.posts.some(p => Math.abs(p.amt) === val);
-    }
-    return t.desc.toLowerCase().includes(s) || t.posts.some(p=>p.acc.includes(s));
+    if(!q) return true; 
+    q = q.replace(/amt:\s*(>=|<=|[><=])?\s*(-?[\d\.]+)/gi, "amt:$1$2");
+
+    const terms = q.toLowerCase().split(' ');
+    
+    return terms.every(term => {
+        let isNeg = false;
+        if (term.startsWith('-') && term.length > 1) {
+            const isNum = /^-\d/.test(term);
+            const isStruct = ['-amt:', '-tag:', '-date:', '-desc:'].some(p => term.startsWith(p));
+            if (isStruct || !isNum) {
+                isNeg = true;
+                term = term.substring(1);
+            }
+        }
+
+        if (term.startsWith('amt:')) {
+            const opVal = term.substring(4);
+            let op = '=', val = 0;
+            if (opVal.startsWith('>=')) { op = '>='; val = parseFloat(opVal.substring(2)); }
+            else if (opVal.startsWith('<=')) { op = '<='; val = parseFloat(opVal.substring(2)); }
+            else if (opVal.startsWith('>')) { op = '>'; val = parseFloat(opVal.substring(1)); }
+            else if (opVal.startsWith('<')) { op = '<'; val = parseFloat(opVal.substring(1)); }
+            else if (opVal.startsWith('=')) { op = '='; val = parseFloat(opVal.substring(1)); }
+            else { val = parseFloat(opVal); }
+            
+            const matchesAmt = t.posts.some(p => {
+                const rv = p.val;
+                if (op === '>=') return rv >= val;
+                if (op === '<=') return rv <= val;
+                if (op === '>') return rv > val;
+                if (op === '<') return rv < val;
+                return Math.abs(rv - val) < 0.01;
+            });
+            return isNeg ? !matchesAmt : matchesAmt;
+        }
+
+        if (term.startsWith('date:')) {
+            const dVal = term.substring(5);
+            let target = dVal;
+            const now = new Date();
+            if (dVal === 'thismonth') target = now.toISOString().slice(0, 7);
+            else if (dVal === 'lastmonth') { now.setMonth(now.getMonth()-1); target = now.toISOString().slice(0, 7); }
+            else if (dVal === 'thisyear') target = now.toISOString().slice(0, 4);
+            return t.date.startsWith(target);
+        }
+
+        if (term.startsWith('tag:')) { const [k,v] = term.substring(4).split(':'); const res = t.tags && t.tags[k] && (!v || t.tags[k]===v); return isNeg ? !res : res; }
+        
+        const textMatch = t.desc.toLowerCase().includes(term) || t.posts.some(p=>p.acc.includes(term));
+        return isNeg ? !textMatch : textMatch;
+    });
 }
 
 const SETTINGS = { strictMode: localStorage.getItem('HL_STRICT')==='true', toggleStrict() { this.strictMode = !this.strictMode; localStorage.setItem('HL_STRICT', this.strictMode); updateStrictUI(); return this.strictMode; } };
 function updateStrictUI() { document.getElementById('strict-badge').style.display = SETTINGS.strictMode ? 'inline' : 'none'; } updateStrictUI();
 
+const FIXED_ROOTS = ['assets', 'liabilities', 'equity', 'income', 'expenses'];
+function isValidRoot(name) { return FIXED_ROOTS.includes(name.split(':')[0]); }
+
+/* =========================================
+   PWA & SERVICE WORKER MANAGER
+   ========================================= */
+const PwaManager = {
+    swCode: `
+const CACHE_NAME = 'hledger-v23.41';
+const ASSETS = ['./', './index.html'];
+self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))); self.skipWaiting(); });
+self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE_NAME ? caches.delete(k) : null)))); self.clients.claim(); });
+self.addEventListener('fetch', (e) => { if (e.request.method !== 'GET') return; e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(res => caches.open(CACHE_NAME).then(cache => { cache.put(e.request, res.clone()); return res; }) ) ).catch(() => caches.match('./'))); });`,
+    init() {
+        if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistration().then(reg => { if (reg && reg.active) document.getElementById('pwa-badge').style.display = 'inline'; });
+        window.addEventListener('offline', () => log("Network lost. App running offline.", 'warn'));
+        window.addEventListener('online', () => log("Network restored.", 'success'));
+    },
+    install() {
+        const blob = new Blob([this.swCode], {type: 'text/javascript'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sw.js'; a.click();
+        log("1. 'sw.js' downloaded.", 'success');
+        log("2. Save it in the same folder as this HTML file.", 'system');
+        log("3. Reload the page to activate offline mode.", 'system');
+    },
+    register() { if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(() => log("Service Worker Registered! Offline Ready.", 'success')).catch(e => log("SW Registration Failed: " + e.message, 'error')); }
+};
+PwaManager.init();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+/* =========================================
+   PERSISTENCE LAYER (SAFE WRITE)
+   ========================================= */
+const Persistence = {
+    fileHandle: null,
+    async mount() {
+        if (!window.showOpenFilePicker) { log("Error: File System API not supported.", 'error'); return false; }
+        try {
+            [this.fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'Hledger Files', accept: {'text/plain': ['.hledger', '.journal', '.txt']} }], multiple: false });
+            const opts = { mode: 'readwrite' };
+            if ((await this.fileHandle.queryPermission(opts)) !== 'granted') if ((await this.fileHandle.requestPermission(opts)) !== 'granted') throw new Error('Write permission denied.');
+            const file = await this.fileHandle.getFile();
+            const remoteText = await file.text();
+            const localText = LedgerManager.getRaw();
+            if (LedgerManager.isDefault()) { LedgerManager.loadRaw(remoteText); log(`Mounted ${file.name}: Loaded remote data.`, 'success'); }
+            else if (localText !== remoteText) { localStorage.setItem('HL_SAFETY_BACKUP', remoteText); await this.write(localText); log(`Mounted ${file.name}: Local changes saved to file.`, 'success'); }
+            else { log(`Mounted ${file.name}: Already in sync.`, 'success'); }
+            document.getElementById('mount-badge').style.display = 'inline'; return true;
+        } catch(e) { if (e.name !== 'AbortError') log(`Mount failed: ${e.message}`, 'error'); return false; }
+    },
+    async write(content) {
+        if (!content && content !== "") { log("CRITICAL: Attempted to write null content.", 'error'); return; }
+        if (this.fileHandle) { try { const writable = await this.fileHandle.createWritable(); await writable.write(content); await writable.close(); } catch(e) { log('File write failed: '+e.message, 'error'); } }
+        LedgerManager.saveLocal(content);
+    }
+};
+
 /* =========================================
    MANAGERS
    ========================================= */
+const ConfigManager = {
+    data: JSON.parse(localStorage.getItem('HL_CONFIG')||'{"backup_reminder":"3", "safety_word":"yes"}'),
+    set(k, v) { this.data[k] = v; localStorage.setItem('HL_CONFIG', JSON.stringify(this.data)); },
+    get(k) { return this.data[k]; },
+    getTxnCount() { return parseInt(localStorage.getItem('HL_TXN_COUNT')||'0'); },
+    incTxnCount() { const n = this.getTxnCount() + 1; localStorage.setItem('HL_TXN_COUNT', n); return n; },
+    resetTxnCount() { localStorage.setItem('HL_TXN_COUNT', '0'); },
+    checkBackup() {
+        const limit = this.get('backup_reminder'); if (limit === 'false') return;
+        const count = this.getTxnCount(); const max = parseInt(limit);
+        if (!isNaN(max) && count >= max) log(`<div class="line dismissible"><span>⚠️ Backup recommended (${count} unsaved changes).</span><span class="dismiss-btn" onclick="ConfigManager.resetTxnCount();this.parentElement.remove()">[DISMISS]</span></div>`);
+    }
+};
+
+const ConfirmationMode = {
+    active: false, callback: null, targetWord: '',
+    start(cmdName, action) {
+        this.targetWord = ConfigManager.get('safety_word') || 'yes';
+        this.callback = action; this.active = true;
+        document.body.classList.add('confirm-mode');
+        document.getElementById('prompt-char').innerText = '⚠️';
+        log(`DANGEROUS ACTION: ${cmdName.toUpperCase()}`, 'warn');
+        log(`Type '${this.targetWord}' to confirm or 'cancel'.`, 'system');
+        updatePrediction();
+    },
+    process(val) {
+        if (val === 'cancel') { this.reset(); log('Action cancelled.', 'success'); return; }
+        if (val === this.targetWord) { this.callback(); this.reset(); } else { log(`Incorrect confirmation.`, 'error'); }
+    },
+    reset() { this.active = false; this.callback = null; document.body.classList.remove('confirm-mode'); document.getElementById('prompt-char').innerText = '$'; updatePrediction(); }
+};
+
 const ThemeManager = {
     init() { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); if(t.preset) this.setPreset(t.preset); if(t.font) this.setFont(t.font); if(t.bg) this.setBg(t.bg); if(t.text) this.setText(t.text); },
     save(k, v) { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); t[k] = v; localStorage.setItem('HL_THEME_CFG', JSON.stringify(t)); },
@@ -275,16 +406,8 @@ const ThemeManager = {
     setBg(color) { document.documentElement.style.setProperty('--bg', color); this.save('bg', color); },
     setText(color) { document.documentElement.style.setProperty('--text', color); this.save('text', color); },
     reset() { localStorage.removeItem('HL_THEME_CFG'); document.documentElement.removeAttribute('data-theme'); document.documentElement.style = ''; this.setPreset('default'); }
-}; ThemeManager.init();
-
-const AliasManager = {
-    aliases: JSON.parse(localStorage.getItem('HL_ALIASES')||'{}'),
-    set(key, val) { this.aliases[key] = val; this.save(); },
-    remove(key) { delete this.aliases[key]; this.save(); },
-    resolve(input) { return this.aliases[input] || input; },
-    save() { localStorage.setItem('HL_ALIASES', JSON.stringify(this.aliases)); },
-    list() { return this.aliases; }
 };
+ThemeManager.init();
 
 const BudgetManager = {
     budgets: JSON.parse(localStorage.getItem('HL_BUDGETS')||'{}'),
@@ -294,187 +417,441 @@ const BudgetManager = {
     save() { localStorage.setItem('HL_BUDGETS', JSON.stringify(this.budgets)); }
 };
 
-const LedgerManager = {
-    current: localStorage.getItem('HL_META')||'default',
-    list: () => Object.keys(localStorage).filter(k=>k.startsWith('HL_DATA_')).map(k=>k.replace('HL_DATA_','')),
-    load() {
-        let data = localStorage.getItem('HL_DATA_' + this.current);
-        if (!data) { data = "; hledger init\n2023-01-01 opening\n    assets:bank  $1000\n    equity:open\n"; localStorage.setItem('HL_DATA_' + this.current, data); }
-        parseData(data); document.getElementById('ledger-badge').innerText = this.current;
-    },
-    switch(n) { this.current = n.toLowerCase(); localStorage.setItem('HL_META', this.current); this.load(); },
-    save(d) { localStorage.setItem('HL_DATA_' + this.current, d); },
-    getRaw() { return localStorage.getItem('HL_DATA_' + this.current); },
-    append(text) { this.save(this.getRaw() + "\n" + text); this.load(); },
-    delete(index) {
-        const txns = [...transactions]; if (index < 0 || index >= txns.length) return false;
-        txns.splice(index, 1); 
-        // Reconstruct including directives
-        const oldRaw = this.getRaw();
-        const directives = oldRaw.split('\n').filter(l => l.startsWith('account ') || l.startsWith('alias ') || l.startsWith(';'));
-        let out = directives.join('\n') + "\n";
-        txns.forEach(t => { out += `\n${t.date} ${t.desc}\n`; t.posts.forEach(p => { out += `    ${p.acc}    ${p.amt}\n`; }); });
-        this.save(out); this.load(); return true;
-    }
-};
-
 /* =========================================
-   PARSER
+   LEDGER PARSER (V2 TRANSACTIONAL)
    ========================================= */
-let transactions = [];
-let definedAccounts = new Set(); // Explicitly defined via 'account'
+let transactions = []; let assertions = []; let headerLines = []; let directiveLines = []; let allowedAccounts = new Set(); let availableTags = new Set(); let fileAliases = {}; 
 
-function parseData(source) {
-    transactions = []; 
-    const accSet = new Set();
-    definedAccounts = new Set(); // Reset
-    
-    const lines = source.split('\n'); 
-    let txn = null;
-    
-    lines.forEach(line => {
-        const clean = line.split(';')[0].trimEnd(); 
-        if (!clean) return;
-        
-        // Account Directive
-        if (clean.startsWith('account ')) {
-            const accName = clean.substring(8).trim();
-            definedAccounts.add(accName);
-            accSet.add(accName);
-            return;
-        }
-
-        const dMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})\s+(.*)$/);
-        const pMatch = clean.match(/^\s+([\w:]+)(?:\s{2,}(.*))?$/);
-        
-        if (dMatch) { 
-            if (txn) transactions.push(finalize(txn, transactions.length)); 
-            txn = { id: transactions.length, date: dMatch[1], desc: dMatch[2], posts: [] }; 
-        } 
-        else if (pMatch && txn) { 
-            const acc = pMatch[1].toLowerCase(); 
-            accSet.add(acc); 
-            txn.posts.push({ acc: acc, amtRaw: pMatch[2] }); 
-        }
-    });
-    if (txn) transactions.push(finalize(txn, transactions.length)); 
-    ENGINE.accounts = Array.from(accSet).sort(); 
+function parseCommodity(rawAmt) {
+    if (!rawAmt) return { val: 0, comm: '', pos: '' };
+    let clean = rawAmt.split('@')[0].trim();
+    const isEuro = /,\d{1,2}$/.test(clean) && clean.includes('.');
+    let valStr = clean; if(isEuro) { valStr = clean.replace(/\./g, '').replace(',', '.'); } else { valStr = clean.replace(/,/g, ''); }
+    const match = valStr.match(/^([^\d\.\-]*)(\-?[\d\.]+)([^^\d\.]*)$/);
+    if (!match) return { val: parseFloat(valStr) || 0, comm: '', pos: '' };
+    const p1 = match[1].trim(); const p3 = match[3].trim();
+    return { val: parseFloat(match[2]), comm: p1 || p3 || '', pos: p1 ? 'left' : 'right' };
 }
-function finalize(txn, id) {
-    let bal = 0, nullPost = null; txn.id = id;
-    txn.posts.forEach(p => { 
-        p.amt = 0; 
-        if(!p.amtRaw) { nullPost=p; } else {
-            if (p.amtRaw.split('-').length > 2) { p.amt = 0; } else {
-                const clean = p.amtRaw.replace(/[^\d.-]/g,'');
-                if (!isNaN(parseFloat(clean))) p.amt = parseFloat(clean);
+
+function parseTags(comment) {
+    const tags = {}; if (!comment) return tags;
+    const matches = comment.matchAll(/(?:^|\s)(?:tag:|#)(\w+)(?::(\w+))?/g);
+    for (const m of matches) { tags[m[1]] = m[2] || true; availableTags.add('tag:'+m[1]); }
+    return tags;
+}
+
+// Transactional Parsing: Parses to temporary state first.
+function parseData(source) {
+    if (source === null || source === undefined) { log("Error: Parser received null input.", 'error'); return; }
+    
+    // Temp State
+    const candTxns = []; const candHeads = []; const candDirs = []; const candAsserts = []; const candAccs = new Set(); const candTags = new Set(); const candAliases = {};
+    const lines = source.split('\n'); let txn = null;
+
+    try {
+        lines.forEach(line => {
+            const clean = line.split(';')[0].trimEnd();
+            const comment = line.includes(';') ? line.substring(line.indexOf(';')) : '';
+            if (clean.startsWith('account ') || clean.startsWith('include ') || clean.startsWith('P ')) { candDirs.push(line); if (clean.startsWith('account ')) candAccs.add(clean.split(' ')[1].trim()); return; }
+            const aliasMatch = clean.match(/^alias\s+(.*?)\s*=\s*(.*)$/);
+            if (aliasMatch) { candDirs.push(line); candAliases[aliasMatch[1].trim()] = aliasMatch[2].trim(); return; }
+            const balMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})\s+balance\s+([\w:]+)\s+(.*)$/);
+            if (balMatch) { 
+                const p = parseCommodity(balMatch[3]);
+                candAsserts.push({ date: balMatch[1], acc: balMatch[2], val: p.val, comm: p.comm, raw: line }); 
+                if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); } txn = null; return; 
             }
-            bal += p.amt; 
-        }
+            if (!clean && comment) { candHeads.push(line); return; }
+            const dMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})\s+([!*]\s+)?(.*)$/);
+            const pMatch = clean.match(/^\s+((?:[\w:\[\]\(\)]| (?! {1}))+)(?:\s{2,}(.*))?$/);
+            if (dMatch) {
+                if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); }
+                txn = { id: candTxns.length, date: dMatch[1], flag: dMatch[2] ? dMatch[2].trim() : '', desc: dMatch[3], posts: [], comment: comment, tags: parseTags(comment) };
+            } else if (pMatch && txn) {
+                let acc = pMatch[1].trim(); if (candAliases[acc]) acc = candAliases[acc]; if (!SETTINGS.strictMode) candAccs.add(acc);
+                const rawAmt = pMatch[2] ? pMatch[2].trim() : '';
+                txn.posts.push({ acc: acc, rawAmt: rawAmt, isImplicit: rawAmt === '', comment: comment, ...parseCommodity(rawAmt) });
+            } else if (!clean && !txn) { candHeads.push(line); }
+        });
+        if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); }
+        
+        // COMMIT
+        transactions = candTxns; headerLines = candHeads; directiveLines = candDirs; assertions = candAsserts; allowedAccounts = candAccs; availableTags = candTags; fileAliases = candAliases;
+        ENGINE.accounts = Array.from(allowedAccounts).sort();
+
+    } catch(e) {
+        log(`CRITICAL PARSE ERROR: ${e.message}. State rolled back.`, 'error');
+    }
+}
+
+function finalize(txn, id, strict = true) {
+    txn.id = id; 
+    let implicitPost = null; 
+    const comms = {};
+    txn.posts.forEach(p => {
+        p.val = Math.round(p.val * 100) / 100;
+        const c = p.comm || '';
+        if (p.isImplicit) { if (implicitPost && strict) throw new Error("Multiple implicit postings"); implicitPost = p; } 
+        else { comms[c] = (comms[c] || 0) + p.val; }
     });
-    if(nullPost) nullPost.amt = -bal;
+    if (implicitPost) { 
+        const nonZeroComms = Object.keys(comms).filter(k => Math.abs(comms[k]) > 0.01);
+        if (nonZeroComms.length === 1) {
+            const c = nonZeroComms[0];
+            implicitPost.val = -Math.round(comms[c] * 100) / 100;
+            implicitPost.comm = c;
+            implicitPost.pos = txn.posts.find(p=>p.comm===c)?.pos || 'left';
+        } else if (nonZeroComms.length === 0) { implicitPost.val = 0; } 
+        else { const msg = "Ambiguous implicit balancing"; if (strict) throw new Error(msg); txn._error = msg; }
+    } else {
+        const errors = [];
+        Object.keys(comms).forEach(c => { if (Math.abs(comms[c]) > 0.01) errors.push(`${c||'Default'} off by ${fmtNum(comms[c])}`); });
+        if (errors.length > 0) { const msg = "Unbalanced: " + errors.join(', '); if (strict) throw new Error(msg); txn._error = msg; }
+    }
     return txn;
 }
 
+function reconstructFile() {
+    let out = ''; directiveLines.forEach(l => out += l + '\n'); out += '\n';
+    const sortedTxns = [...transactions].sort((a,b) => a.date.localeCompare(b.date));
+    sortedTxns.forEach(t => {
+        const flag = t.flag ? t.flag + ' ' : '';
+        out += `${t.date} ${flag}${t.desc} ${t.comment||''}\n`;
+        t.posts.forEach(p => {
+            let amtStr = '';
+            if (!p.isImplicit) { const num = fmtNum(p.val); if (p.comm) { amtStr = p.pos === 'left' ? `${p.comm}${num}` : `${num} ${p.comm}`; } else { amtStr = num; } }
+            const comment = p.comment ? ' ' + p.comment : '';
+            out += `    ${p.acc}  ${amtStr}${comment}\n`.trimEnd() + '\n';
+        });
+        out += '\n';
+    });
+    assertions.forEach(a => out += `${a.raw}\n`);
+    return out.trim() + '\n';
+}
+
+const LedgerManager = {
+    current: localStorage.getItem('HL_META')||'default',
+    list: () => Object.keys(localStorage).filter(k=>k.startsWith('HL_DATA_')).map(k=>k.replace('HL_DATA_','')),
+    load() { const data = localStorage.getItem('HL_DATA_' + this.current); if (data) { parseData(data); } else { this.loadDefault(); } document.getElementById('ledger-badge').innerText = this.current; },
+    getDefaultTemplate() { let data = "; hledger init\nalias food = expenses:food\n\n"; FIXED_ROOTS.forEach(r => data += `account ${r}\n`); data += "\n2023-01-01 opening\n    assets:bank  $1000\n    equity:opening\n"; return data; },
+    loadDefault() { let data = this.getDefaultTemplate(); this.saveLocal(data); parseData(data); },
+    isDefault() { const current = this.getRaw().trim(); parseData(this.getDefaultTemplate()); const normalizedDefault = reconstructFile().trim(); parseData(current); return current === normalizedDefault; },
+    loadRaw(text) { parseData(text); this.saveLocal(text); }, 
+    reset() { localStorage.removeItem('HL_DATA_' + this.current); this.loadDefault(); log('Ledger reset to defaults.', 'warn'); },
+    switch(n) { this.current = n.toLowerCase(); localStorage.setItem('HL_META', this.current); this.load(); document.getElementById('mount-badge').style.display = 'none'; Persistence.fileHandle = null; },
+    saveLocal(d) { try { localStorage.setItem('HL_DATA_' + this.current, d); } catch(e) { if(e.name === 'QuotaExceededError') { log("STORAGE FULL: Save failed!", 'error'); } } },
+    save(d) { Persistence.write(d); },
+    getRaw() { return reconstructFile(); },
+    delete(index) { const txns = [...transactions]; if (index < 0 || index >= txns.length) return false; txns.splice(index, 1); transactions = txns; this.save(reconstructFile()); parseData(reconstructFile()); return true; },
+    addAccount(name) { if (!isValidRoot(name)) { log(`Error: Root must be one of: ${FIXED_ROOTS.join(', ')}`, 'error'); return false; } if (allowedAccounts.has(name)) return false; directiveLines.push(`account ${name}`); this.save(reconstructFile()); parseData(reconstructFile()); return true; },
+    addAssertion(acc, val) { const today = new Date().toISOString().split('T')[0]; assertions.push({ date: today, acc: acc, raw: `${today} balance ${acc}    ${val}` }); this.save(reconstructFile()); parseData(reconstructFile()); return true; },
+    addAlias(key, val) { directiveLines.push(`alias ${key} = ${val}`); this.save(reconstructFile()); parseData(reconstructFile()); return true; },
+    merge(newText) {
+        const oldTxns = [...transactions]; const oldDirs = [...directiveLines]; const oldAsserts = [...assertions]; const oldAliases = {...fileAliases};
+        parseData(newText);
+        const newTxns = [...transactions]; const newDirs = [...directiveLines]; const newAsserts = [...assertions]; const newAliases = {...fileAliases};
+        transactions = [...oldTxns, ...newTxns];
+        const dirSet = new Set(oldDirs); newDirs.forEach(d => dirSet.add(d)); directiveLines = Array.from(dirSet);
+        assertions = [...oldAsserts, ...newAsserts]; fileAliases = {...oldAliases, ...newAliases};
+        const mergedRaw = reconstructFile(); this.save(mergedRaw); parseData(mergedRaw); log(`Merged ${newTxns.length} txns, ${newDirs.length} directives.`, 'success');
+    }
+};
+
+const Editor = {
+    mode: 'raw',
+    open(mode='raw') { 
+        this.mode = mode; const editor = document.getElementById('raw-editor'); const title = document.getElementById('editor-title');
+        if (mode === 'batch') { editor.value = ''; editor.placeholder = "Paste raw transactions here to append...\n\n2025-10-25 grocery\n    expenses:food  $50\n    assets:bank"; title.innerText = "SMART BATCH (APPEND)"; } 
+        else { editor.value = LedgerManager.getRaw(); title.innerText = "RAW EDITOR"; }
+        document.getElementById('editor-modal').classList.add('open'); 
+    },
+    save() { 
+        const txt = document.getElementById('raw-editor').value;
+        if (this.mode === 'batch') { const current = LedgerManager.getRaw(); const newVal = current + "\n" + txt; LedgerManager.save(newVal); LedgerManager.loadRaw(newVal); log('Batch transactions appended.', 'success'); ConfigManager.incTxnCount(); ConfigManager.checkBackup(); } 
+        else { LedgerManager.save(txt); LedgerManager.loadRaw(txt); log('Ledger rewritten.', 'success'); ConfigManager.incTxnCount(); ConfigManager.checkBackup(); }
+        this.close(); 
+    },
+    close() { document.getElementById('editor-modal').classList.remove('open'); }
+};
+
 /* =========================================
-   AI ENGINE
+   TITANIUM GRAPH ENGINE (V3.2)
    ========================================= */
-const ENGINE = {
-    schema: {
-        'coa': { type: 'branch', branches: { 'add': {type:'hint',text:'<name>'}, 'list':{type:'info',text:'flat list'} }, dynamic: () => ['<filter>'] },
-        'bs': { type: 'info', text: 'balance sheet' },
-        'check': { type: 'info', text: 'integrity check' },
-        'man': { type: 'enum', options: () => Object.keys(MAN_PAGES) },
-        'dash': { type: 'info', text: 'show dashboard' },
-        'edit': { type: 'info', text: 'open raw editor' },
-        'undo': { type: 'info', text: 'revert last txn' },
-        'stats': { type: 'info', text: 'file metrics' },
-        'strict': { type: 'info', text: 'toggle validation' },
-        'clear': { type: 'info', text: 'clear screen' },
-        'help': { type: 'info', text: 'show command list' },
-        'forecast': { type: 'info', text: 'project balance' },
-        'import': { type: 'branch', branches: { 'replace': {type:'info',text:'overwrite'}, 'append': {type:'info',text:'add'} } },
-        'export': { type: 'branch', branches: { 'copy': {type:'info',text:'to clipboard'}, 'file': {type:'info',text:'download'} } },
-        'budget': { type: 'branch', branches: { 'rm': { type: 'enum', options: () => Object.keys(BudgetManager.get()) } }, dynamic: () => Object.keys(BudgetManager.get()) },
-        'alias': { type: 'branch', branches: { 'list': {type:'info',text:'show all'}, 'rm': { type: 'enum', options: () => Object.keys(AliasManager.list()) } } },
-        'recur': { type: 'query', hint: '<search>' },
-        'rm': { type: 'query', hint: '<id>' },
-        'theme': { type: 'branch', branches: { 'default': null, 'matrix': null, 'dracula': null, 'paper': null, 'font': { type: 'params', options: ['12px', '14px', '16px', '18px'] }, 'bg': { type: 'hint', text: '#hex' }, 'text': { type: 'hint', text: '#hex' }, 'reset': null } },
-        'ledger': { type: 'branch', branches: { 'list': null, 'new': { type: 'hint', text: '<name>' }, 'switch': { type: 'enum', options: () => LedgerManager.list() } } },
-        'graph': { type: 'branch', branches: { 'trend': { type: 'params', options: ['filter:', 'sort:', 'date:'] }, 'exp': { type: 'params', options: ['filter:', 'sort:', 'date:'] }, 'pie': { type: 'params', options: ['filter:', 'date:'] } } },
-        'pnl': { type: 'query' }, 'bal': { type: 'query' }, 'reg': { type: 'query' },
-        'add': { type: 'info', text: 'new transaction' }, 'reset': { type: 'info', text: 'reset theme' }
+const GraphEngine = {
+    palette: ['#38bdf8', '#4ade80', '#f87171', '#fbbf24', '#a78bfa', '#22d3ee', '#f472b6', '#94a3b8'],
+    catmullRom2bezier(points) {
+        let d = `M ${points[0][0]},${points[0][1]}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(i - 1, 0)], p1 = points[i], p2 = points[i + 1], p3 = points[Math.min(i + 2, points.length - 1)];
+            const cp1x = p1[0] + (p2[0] - p0[0]) / 6, cp1y = p1[1] + (p2[1] - p0[1]) / 6, cp2x = p2[0] - (p3[0] - p1[0]) / 6, cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+            d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2[0]},${p2[1]}`;
+        } return d;
     },
-    accounts: [],
-    predict(input) {
-        if (!input) return { suggest: '', context: 'Command', options: Object.keys(this.schema).map(k=>({text:k, type:'cmd'})) };
-        const parts = input.split(' '); const cmd = parts[0]; const lastArg = parts[parts.length - 1];
-        if (parts.length === 1) {
-            const matches = Object.keys(this.schema).filter(k => k.startsWith(cmd));
-            if (matches.length === 1 && matches[0] !== cmd) return { suggest: matches[0].substring(cmd.length), context:'Command', options: matches.map(k=>({text:k, type:'cmd'})) };
-            if (matches.length > 0 && input.endsWith(' ')) return this.getNextStep(cmd, [], '');
-            return { suggest: '', context:'Command', options: matches.map(k=>({text:k, type:'cmd'})) };
-        }
-        return this.getNextStep(cmd, parts.slice(1), lastArg);
+    getNiceTicks(min, max, count=5) {
+        const range = this.niceNum(max - min, false);
+        const tickSpacing = this.niceNum(range / (count - 1), true);
+        const niceMin = Math.floor(min / tickSpacing) * tickSpacing;
+        const niceMax = Math.ceil(max / tickSpacing) * tickSpacing;
+        const ticks = [];
+        for (let x = niceMin; x <= niceMax + 0.5 * tickSpacing; x += tickSpacing) ticks.push(x);
+        return { min: niceMin, max: niceMax, ticks };
     },
-    getNextStep(cmd, args, lastArg) {
-        const node = this.schema[cmd]; if (!node) return { suggest: '', options: [] };
-        if (node.type === 'info') return { suggest: '', context: 'Info', options: [{ isHint: true, text: node.text, type:'info' }] };
-        if (node.type === 'branch') {
-            const subCmd = args[0];
-            if ((cmd==='budget'||cmd==='coa') && args.length===0 && !lastArg.endsWith(' ') && node.dynamic) return { suggest: '', context:'Option', options: node.dynamic().concat(Object.keys(node.branches)).map(k=>({text:k, type:'opt'})) };
-            
-            if (!subCmd || (args.length === 1 && !lastArg.endsWith(' '))) {
-                const options = Object.keys(node.branches); const matches = options.filter(o => o.startsWith(lastArg || ''));
-                let ghost = ''; if (matches.length === 1 && subCmd && matches[0] !== subCmd) ghost = matches[0].substring(subCmd.length);
-                return { suggest: ghost, context:'Subcmd', options: matches.map(k=>({text:k, type:'opt'})) };
+    niceNum(range, round) {
+        const exp = Math.floor(Math.log10(range)); const f = range / Math.pow(10, exp); let nf;
+        if (round) { if (f < 1.5) nf = 1; else if (f < 3) nf = 2; else if (f < 7) nf = 5; else nf = 10; } 
+        else { if (f <= 1) nf = 1; else if (f <= 2) nf = 2; else if (f <= 5) nf = 5; else nf = 10; }
+        return nf * Math.pow(10, exp);
+    },
+    generate(transactions, args) {
+        const p = { by: 'month', type: 'line', filter: [], accounts: [], accumulate: false, forecast: false };
+        args.forEach(a => {
+            const low = a.toLowerCase();
+            if (a.startsWith('by:')) p.by = a.substring(3);
+            else if (a.startsWith('type:')) p.type = a.substring(5);
+            else if (['cum', 'cumulative'].includes(low)) p.accumulate = true;
+            else if (a === 'forecast') p.forecast = true;
+            else if (a.startsWith('tag:') || a.startsWith('date:') || a.startsWith('desc:') || a.startsWith('amt:')) p.filter.push(a);
+            else { const isAccount = isValidRoot(low) || ENGINE.accounts.some(acc => acc.toLowerCase().includes(low)) || fileAliases[low]; if (isAccount) p.accounts.push(a); else p.filter.push(a); }
+        });
+        if (p.accounts.length === 0) p.accounts.push('assets'); 
+        const subset = transactions.filter(t => match(t, p.filter.join(' ')));
+        if (subset.length === 0) return '<div class="line warn">No matching data to graph.</div>';
+        const seriesList = p.accounts.map(acc => this.prepareSeries(subset, acc, p.by, p.accumulate)).filter(s => s);
+        if (p.type === 'donut') return this.renderDonut(seriesList);
+        return this.renderSVG(seriesList, p.type, p.by, p.forecast);
+    },
+    prepareSeries(txns, accFilter, by, accumulate) {
+        const buckets = {}; const allKeys = new Set();
+        txns.forEach(t => {
+            let key = t.date; if (by === 'month') key = t.date.substring(0, 7); else if (by === 'year') key = t.date.substring(0, 4); allKeys.add(key);
+            let val = 0; t.posts.forEach(p => { if (p.acc.includes(accFilter)) val += p.val; }); buckets[key] = (buckets[key] || 0) + val;
+        });
+        const sortedKeys = Array.from(allKeys).sort(); if (sortedKeys.length === 0) return null;
+        let running = 0; const data = sortedKeys.map(k => { if (accumulate) running += (buckets[k] || 0); return { x: k, y: accumulate ? running : (buckets[k] || 0) }; });
+        return { name: accFilter, data };
+    },
+    renderSVG(seriesList, type, by, forecast) {
+        const H = 250, W = 600; const pad = { t: 20, r: 20, b: 30, l: 50 }; const drawW = W - pad.l - pad.r; const drawH = H - pad.t - pad.b;
+        let allY = seriesList.flatMap(s => s.data.map(d => d.y)); let minVal = Math.min(...allY, 0); let maxVal = Math.max(...allY, 0); if (minVal === 0 && maxVal === 0) maxVal = 100;
+        const scale = this.getNiceTicks(minVal, maxVal); const dates = seriesList[0].data.map(d => d.x);
+        const getX = (i) => pad.l + (i / (dates.length - 1 || 1)) * drawW; const getY = (v) => pad.t + drawH - ((v - scale.min) / (scale.max - scale.min)) * drawH; const zeroY = getY(0);
+        let defs = `<defs>`; seriesList.forEach((s, i) => { const c = this.palette[i % this.palette.length]; defs += `<linearGradient id="grad${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${c}" stop-opacity="0.5"/><stop offset="100%" stop-color="${c}" stop-opacity="0"/></linearGradient>`; }); defs += `</defs>`;
+        let grid = ``; scale.ticks.forEach(t => { const y = getY(t); grid += `<line class="grid-line" x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}"/><text x="${pad.l-10}" y="${y+3}" text-anchor="end">${fmtNum(t)}</text>`; });
+        let paths = ``, overlays = ``;
+        seriesList.forEach((s, idx) => {
+            const color = this.palette[idx % this.palette.length]; const points = s.data.map((d, i) => [getX(i), getY(d.y)]);
+            if (type === 'bar') {
+                const slotWidth = drawW / dates.length; const barGroupWidth = slotWidth * 0.8; const singleBarWidth = barGroupWidth / seriesList.length;
+                s.data.forEach((d, i) => { const xCenter = pad.l + (i * slotWidth) + (slotWidth / 2); const x = xCenter - (barGroupWidth / 2) + (idx * singleBarWidth); const h = Math.abs(getY(d.y) - zeroY); const y = d.y >= 0 ? getY(d.y) : zeroY; paths += `<rect x="${x}" y="${y}" width="${singleBarWidth}" height="${h}" fill="${color}" opacity="0.8" rx="1"/>`; });
+            } else if (type === 'scatter') {
+                s.data.forEach((d, i) => { paths += `<circle cx="${getX(i)}" cy="${getY(d.y)}" r="3" fill="${color}" opacity="0.7"/>`; });
+                const trend = MathEngine.linearRegression(s.data); if (trend) { const tPts = trend.map((d, i) => [getX(i), getY(d.y)]); paths += `<polyline points="${tPts.join(' ')}" class="trend-line"/>`; }
+            } else {
+                let dPath = this.catmullRom2bezier(points); if (type === 'area') { paths += `<path d="${dPath} L ${points[points.length-1][0]},${zeroY} L ${points[0][0]},${zeroY} Z" class="chart-area" fill="url(#grad${idx})"/>`; }
+                paths += `<path d="${dPath}" class="chart-line" stroke="${color}"/>`;
             }
-            if (node.branches[subCmd]) {
-                const subNode = node.branches[subCmd];
-                if (subNode.type === 'params') return this.getParamPrediction(args.slice(1), lastArg, subNode.options);
-                if (subNode.type === 'hint' || subNode.type === 'info') return { suggest: '', context:'Input', options: [{ isHint: true, text: subNode.text, type:'info' }] };
-                if (subNode.type === 'enum') return this.getEnumPrediction(args[1], subNode.options());
-            }
-        }
-        if (node.type === 'enum') return this.getEnumPrediction(args[0], node.options());
-        if (node.type === 'query' || lastArg.includes(':')) return this.getCompositePrediction(lastArg, node.context || 'Filter');
-        return { suggest: '', context:'Unknown', options: [] };
+            s.data.forEach((d, i) => { let x = getX(i); if (type === 'bar') { const slotWidth = drawW / dates.length; x = pad.l + (i * slotWidth) + (slotWidth / 2); } overlays += `<circle cx="${x}" cy="${getY(d.y)}" class="hover-dot" data-idx="${i}" fill="${color}"/>`; });
+        });
+        const containerId = `graph-${Date.now()}`; const meta = JSON.stringify({ dates, series: seriesList.map((s,i) => ({name:s.name, color:this.palette[i%this.palette.length], data:s.data})), pad, W, H, type });
+        const svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%" onmousemove="GraphEngine.hover(event, this)" ontouchmove="GraphEngine.hover(event, this)" onmouseleave="GraphEngine.leave(this)" data-meta='${meta}'>${defs} ${grid} <line class="grid-line" x1="${pad.l}" y1="${zeroY}" x2="${W-pad.r}" y2="${zeroY}" stroke-opacity="1"/> ${paths} <line class="crosshair" x1="0" y1="0" x2="0" y2="${H}"/> ${overlays}</svg>`;
+        const legend = seriesList.map((s,i) => `<div class="legend-item"><div class="legend-dot" style="background:${this.palette[i%this.palette.length]}"></div><span>${s.name}</span></div>`).join('');
+        return `<div class="graph-container" id="${containerId}"><div class="graph-header"><span>${type.toUpperCase()} (${by})</span></div>${svg}<div class="graph-legend" style="margin-top:10px">${legend}</div></div>`;
     },
-    getEnumPrediction(curr, opts) {
-        const matches = opts.filter(o => o.startsWith(curr||'')); let ghost = '';
-        if (matches.length > 0 && curr && matches[0] !== curr) ghost = matches[0].substring(curr.length);
-        return { suggest: ghost, context:'Option', options: matches.map(k=>({text:k, type:'opt'})) };
+    renderDonut(seriesList) {
+        const sums = seriesList.map((s, i) => ({ label: s.name, val: Math.abs(s.data.reduce((a,b)=>a+b.y, 0)), color: this.palette[i%this.palette.length] })).sort((a,b)=>b.val - a.val);
+        const total = sums.reduce((a,b)=>a+b.val, 0); let acc = 0;
+        const paths = sums.map(s => { const start = (acc / total) * Math.PI * 2; acc += s.val; const end = (acc / total) * Math.PI * 2; const x1 = 100 + 80 * Math.cos(start - Math.PI/2), y1 = 100 + 80 * Math.sin(start - Math.PI/2), x2 = 100 + 80 * Math.cos(end - Math.PI/2), y2 = 100 + 80 * Math.sin(end - Math.PI/2); const large = (end - start) > Math.PI ? 1 : 0; const d = `M 100,100 L ${x1},${y1} A 80,80 0 ${large} 1 ${x2},${y2} Z`; return `<path d="${d}" fill="${s.color}" stroke="var(--panel)" stroke-width="2"/>`; }).join('');
+        const legend = sums.map(s => `<div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div><span>${s.label} (${Math.round(s.val/total*100)}%)</span></div>`).join('');
+        return `<div class="graph-container"><div class="graph-header"><span>DISTRIBUTION</span></div><div style="display:flex;align-items:center;gap:20px;justify-content:center;flex-wrap:wrap"><svg viewBox="0 0 200 200" width="160" height="160">${paths} <circle cx="100" cy="100" r="50" fill="var(--panel)"/><text x="100" y="105" text-anchor="middle" font-size="14" fill="var(--text)" font-weight="bold">${total > 1000 ? (total/1000).toFixed(1)+'k' : total.toFixed(0)}</text></svg><div style="display:flex;flex-direction:column;gap:5px">${legend}</div></div></div>`;
     },
-    getParamPrediction(args, lastArg, validParams) {
-        if (!lastArg.includes(':')) {
-             const matches = validParams.filter(p => p.startsWith(lastArg));
-             return { suggest: matches.length===1?matches[0].substring(lastArg.length):'', context:'Param', options: matches.map(k=>({text:k, type:'param'})) };
-        }
-        return this.getCompositePrediction(lastArg, 'Value');
+    hover(e, svg) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const meta = JSON.parse(svg.dataset.meta); const rect = svg.getBoundingClientRect(); const mx = clientX - rect.left;
+        const drawW = meta.W - meta.pad.l - meta.pad.r; const ratio = (mx - meta.pad.l) / drawW;
+        let idx = Math.round(ratio * (meta.dates.length - 1)); idx = Math.max(0, Math.min(idx, meta.dates.length - 1));
+        let x; if (meta.type === 'bar') { const slotWidth = drawW / meta.dates.length; x = meta.pad.l + (idx * slotWidth) + (slotWidth / 2); } else { x = meta.pad.l + (idx / (meta.dates.length - 1 || 1)) * drawW; }
+        const ch = svg.querySelector('.crosshair'); ch.setAttribute('x1', x); ch.setAttribute('x2', x); ch.style.opacity = 1;
+        svg.querySelectorAll('.hover-dot').forEach(d => d.style.opacity = 0); svg.querySelectorAll(`.hover-dot[data-idx="${idx}"]`).forEach(d => { d.style.opacity = 1; d.setAttribute('r', 6); });
+        const tt = document.getElementById('graph-tooltip'); tt.style.opacity = 1; let tx = clientX + 15; let ty = clientY + 15; if (tx + 150 > window.innerWidth) tx -= 160; tt.style.transform = `translate(${tx}px, ${ty}px)`;
+        let content = `<div class="tt-head">${meta.dates[idx]}</div>`; meta.series.forEach(s => { content += `<div class="tt-row"><span style="color:${s.color}">● ${s.name}</span><span>${fmtNum(s.data[idx].y)}</span></div>`; });
+        tt.innerHTML = content;
     },
-    getCompositePrediction(str, contextLabel) {
-        const [key, val] = str.includes(':') ? str.split(':') : ['', str];
-        const prefix = str.includes(':') ? key + ':' : ''; const search = val || key;
-        let results = [];
-        const accMatches = this.accounts.filter(a => a.includes(search || ''));
-        accMatches.forEach(a => results.push({ text: prefix + a, type: 'acc' }));
-        if (!str.includes(':') || key === 'date') {
-            const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0');
-            if (('date:'+y).startsWith(str)) results.push({ text: `date:${y}`, type: 'date' });
-            if (('date:'+y+'-'+m).startsWith(str)) results.push({ text: `date:${y}-${m}`, type: 'date' });
-        }
-        if (!str.includes(':') || key === 'depth') { ['depth:2', 'depth:3'].forEach(o => { if(o.startsWith(str)) results.push({ text: o, type: 'cmd' }); }); }
-        if (!str.includes(':') || key === 'amt') { ['amt:>', 'amt:<'].forEach(o => { if(o.startsWith(str)) results.push({ text: o, type: 'param' }); }); }
-        
-        const finalOptions = results.filter(o => o.text.startsWith(str));
-        let ghost = '';
-        if (finalOptions.length > 0) { const strict = finalOptions.find(a => a.text.startsWith(str)); if (strict) ghost = strict.text.substring(str.length); }
-        return { suggest: ghost, context: contextLabel, options: finalOptions };
+    leave(svg) { svg.querySelector('.crosshair').style.opacity = 0; svg.querySelectorAll('.hover-dot').forEach(d => d.style.opacity = 0); document.getElementById('graph-tooltip').style.opacity = 0; }
+};
+
+/* =========================================
+   TUTORIAL CONTENT ENGINE
+   ========================================= */
+const Tutorial = {
+    manPages: {
+        'add': { synopsis: 'add [batch | <line>]', desc: 'Adds a transaction. Uses Smart Logic: if you provide only 1 amount, it calculates the balancing entry automatically. If you provide no args, it launches the Wizard.', examples: ['add Lunch food 15', 'add food 10 wallet', 'add batch'] },
+        'bal': { synopsis: 'bal [filter]', desc: 'Shows the summation of balances for accounts matching the filter. Hides zero-balance accounts.', examples: ['bal assets', 'bal food'] },
+        'dash': { synopsis: 'dash', desc: 'Shows the main financial dashboard with Net Worth, Monthly P&L, and Savings Rate.', examples: ['dash'] },
+        'reg': { synopsis: 'reg [filter]', desc: 'Shows the register (ledger) of individual transactions matching the filter.', examples: ['reg food', 'reg >100'] },
+        'graph': { synopsis: 'graph [accs] [type] [opts]', desc: 'Plots data. Supports: line, bar, area, scatter, donut. Opts: cum (cumulative), forecast (linear regression), by:year.', examples: ['graph assets area', 'graph expenses donut'] },
+        'mount': { synopsis: 'mount', desc: 'Connects the app to a real file on your device for persistent storage. Requires a browser with File System Access API.', examples: ['mount'] },
+        'export': { synopsis: 'export [file|copy|csv]', desc: 'Exports your data. "file" downloads .hledger, "copy" puts it in clipboard, "csv" downloads spreadsheet.', examples: ['export csv'] },
+        'check': { synopsis: 'check', desc: 'Validates all "balance" assertions in the ledger against calculated history. Reports errors.', examples: ['check'] },
+        'assert': { synopsis: 'assert <acc> <amt>', desc: 'Inserts a balance assertion for the current date. Used to verify your books against real bank statements.', examples: ['assert bank 1250.50'] },
+        'stats': { synopsis: 'stats', desc: 'Shows technical statistics about the current ledger (transaction count, account count, usage).', examples: ['stats'] },
+        'alias': { synopsis: 'alias <add|list>', desc: 'Manage file aliases. Aliases map short names (e.g., "food") to full account names (e.g., "expenses:food").', examples: ['alias add f expenses:food'] },
+        'config': { synopsis: 'config <set|list|theme>', desc: 'System configuration. Change themes, set safety words, toggle strict mode.', examples: ['config theme dracula', 'config set safety_word apple'] },
+        'ledger': { synopsis: 'ledger <switch|import|reset>', desc: 'Manage multiple ledger files in local storage.', examples: ['ledger switch business'] },
+        'pwa': { synopsis: 'pwa install', desc: 'Downloads the Service Worker to make the app work offline.', examples: ['pwa install'] },
+        'undo': { synopsis: 'undo', desc: 'Reverts the last added transaction block.', examples: ['undo'] },
+        'clear': { synopsis: 'clear', desc: 'Clears the terminal output.', examples: ['clear'] },
+        'help': { synopsis: 'help', desc: 'Shows the categorization of commands.', examples: ['help'] },
+        'recur': { synopsis: 'recur <filter>', desc: 'Finds the last matching transaction and opens the Wizard pre-filled with its details.', examples: ['recur rent'] }
+    },
+    get(args) {
+        const sub = args[0];
+        if (!sub) return this.renderMenu();
+        if (sub === 'command' && args[1]) return this.renderMan(args[1]);
+        if (this[sub]) return this[sub]();
+        return `<div class="line error">Unknown tutorial topic: ${sub}</div>`;
+    },
+    renderMenu() {
+        let h = `<div class="help-cat">TUTORIAL TOPICS</div>`;
+        h += `<div class="help-cmd" onclick="run('tutorial basics')"><span>basics</span><span>Double-entry concepts</span></div>`;
+        h += `<div class="help-cmd" onclick="run('tutorial tips')"><span>tips</span><span>Power user tricks</span></div>`;
+        h += `<div class="help-cmd" onclick="run('tutorial backup')"><span>backup</span><span>Data safety</span></div>`;
+        h += `<div class="line system">Type 'tutorial command <name>' for syntax.</div>`;
+        return h;
+    },
+    renderMan(cmd) {
+        const m = this.manPages[cmd];
+        if (!m) return `<div class="line error">No manual entry for '${cmd}'</div>`;
+        return `<div class="man-page"><div class="man-head">${cmd}</div><div class="man-sect">Synopsis</div><div class="line">${m.synopsis}</div><div class="man-sect">Description</div><div class="line">${m.desc}</div><div class="man-sect">Example</div><div class="tut-code" onclick="fill('${m.examples[0]}')">${m.examples[0]}</div></div>`;
+    },
+    renderBlock(title, text, code) {
+        return `<div class="tut-block"><div class="tut-title">${title}</div><div class="tut-text">${text}</div>${code ? `<div class="tut-code" onclick="fill('${code}')">${code}</div>` : ''}</div>`;
+    },
+    basics() {
+        let h = `<div class="help-cat">BASICS: DOUBLE ENTRY</div>`;
+        h += this.renderBlock("1. The Concept", "Every money movement comes FROM somewhere and goes TO somewhere. If you buy Lunch ($10), money moves FROM 'Wallet' TO 'Food'.");
+        h += this.renderBlock("2. Adding Data", "Use the 'add' command. Hledger reads Right-to-Left. <br>Format: <b>add [Desc] [ToAccount] [Amount] [FromAccount]</b>", "add Lunch food 10 wallet");
+        h += this.renderBlock("3. Implicit Balancing", "If you omit the [FromAccount], you must balance it manually or the system will reject it.", "add Lunch food 10 wallet");
+        h += this.renderBlock("4. Viewing Data", "See your balances with 'dash' or 'bal'.", "bal assets");
+        return h;
+    },
+    tips() {
+        let h = `<div class="help-cat">POWER USER TIPS</div>`;
+        h += this.renderBlock("Math Engine", "You can type math expressions anywhere. Useful for calculating splits.", "= 500 / 3");
+        h += this.renderBlock("Date Aliases", "Use 'today', 'yesterday' or relative dates in filters.", "reg date:lastmonth");
+        h += this.renderBlock("Amount Filters", "Find large transactions easily.", "reg amt:>100");
+        h += this.renderBlock("Clickable Chips", "The suggestion chips above the input bar are clickable. Math results are also clickable to paste them.");
+        return h;
+    },
+    backup() {
+        let h = `<div class="help-cat">DATA SAFETY</div>`;
+        h += this.renderBlock("Local Storage", "By default, data lives in your browser. Clearing cache deletes it.");
+        h += this.renderBlock("Mounting (Recommended)", "Use 'mount' to save data to a real .txt or .hledger file on your device. This keeps it safe.", "mount");
+        h += this.renderBlock("Exporting", "Download snapshots if mounting isn't supported.", "export file");
+        return h;
     }
 };
 
 /* =========================================
-   UI & COMMANDS
+   ANALYSIS ENGINE (STRICT)
+   ========================================= */
+const ENGINE = {
+    schema: {
+        'dash':   { type: 'exec', spec: [], icon:'📊' },
+        'mount':  { type: 'exec', spec: [], icon:'💾' },
+        'undo':   { type: 'exec', spec: [], icon:'↩️' },
+        'clear':  { type: 'exec', spec: [], icon:'🧹' },
+        'help':   { type: 'exec', spec: [], icon:'❓' },
+        'check':  { type: 'exec', spec: [], icon:'✅' },
+        'stats':  { type: 'exec', spec: [], icon:'📈' },
+        'edit':   { type: 'exec', spec: [], icon:'📝' },
+        'bal':    { type: 'view', spec: ['acc', 'tag', 'date'], limits: {acc:99, tag:99, date:1}, icon:'⚖️' },
+        'reg':    { type: 'view', spec: ['acc', 'tag', 'date'], limits: {acc:99, tag:99, date:1}, icon:'📜' },
+        'pnl':    { type: 'view', spec: ['acc', 'tag', 'date'], limits: {acc:99, tag:99, date:1}, icon:'💹' },
+        'coa':    { type: 'view', spec: ['acc', 'tag'], limits: {acc:1, tag:1}, icon:'🌳' },
+        'graph':  { type: 'view', spec: ['acc', 'tag', 'date', 'graph_opts'], limits: {acc:99, tag:1, date:1, graph_opts:3}, icon:'📉' },
+        'recur':  { type: 'view', spec: ['acc', 'tag'], limits: {acc:1, tag:1}, icon:'🔄' },
+        'assert': { type: 'util', spec: ['acc', 'num'], strictPos: true, icon:'⚖️' },
+        'rm':     { type: 'util', spec: ['num'], strictPos: true, icon:'🗑️' },
+        'pwa':    { type: 'branch', branches: {'install': {spec:[]}}, icon: '🌐' },
+        'account': { type: 'branch', branches: { 'add': {spec:[]} }, icon:'👤' },
+        'alias':   { type: 'branch', branches: { 'add': {spec:[]}, 'list': {spec:[]} }, icon:'🏷️' },
+        'add':     { type: 'smart_add', icon:'➕' },
+        'export':  { type: 'branch', branches: { 'copy': {spec:[]}, 'file': {spec:[]}, 'csv': {spec:[]} }, icon:'📤' },
+        'tutorial': { type: 'branch', branches: { 'basics':{spec:[]}, 'tips':{spec:[]}, 'backup':{spec:[]}, 'command':{ type: 'branch', branches: Object.keys(Tutorial.manPages).reduce((acc, key) => { acc[key] = {spec:[]}; return acc; }, {}) } }, icon: '🎓' },
+        'config': { type: 'branch', branches: { 'set': { spec: ['conf_key', 'conf_val'], strictPos: true }, 'list': { spec: [] }, 'strict': { spec: [] }, 'theme': { type: 'branch', branches: {'reset': {spec:[]}, 'font': {spec:['num'], strictPos:true}, 'bg': {spec:['val'], strictPos:true}, 'text': {spec:['val'], strictPos:true}, 'matrix': {spec:[]}, 'dracula': {spec:[]}, 'paper': {spec:[]}, 'default': {spec:[]}}}, 'budget': { type: 'branch', branches: {'set': { spec: ['acc', 'num'], strictPos: true }, 'rm': { spec: ['acc'], strictPos: true }, 'list': { spec: [] }}}}, icon: '⚙️' },
+        'ledger': { type: 'branch', branches: { 'import': {spec:[]}, 'merge': {spec:[]}, 'reset': {spec:[]}, 'list': {spec:[]}, 'switch': {spec:['name'], strictPos:true} }, icon: '📚' }
+    },
+    accounts: [], usage: JSON.parse(localStorage.getItem('HL_USAGE') || '{}'),
+    recordUsage(token) { this.usage[token] = (this.usage[token] || 0) + 1; localStorage.setItem('HL_USAGE', JSON.stringify(this.usage)); },
+    predict(input) {
+        if (!input) return { suggest: '', context: 'READY', options: this.getTopCommands() };
+        let tokens = input.split(' ').filter(t => t.length > 0); const lastCharIsSpace = input.endsWith(' ');
+        let cmd = tokens[0];
+        if (!this.schema[cmd]) { const matches = Object.keys(this.schema).filter(k => k.startsWith(cmd)); if (matches.length > 0) return { suggest: matches[0].substring(cmd.length), context: 'CMD', options: matches.map(k=>({text:k, type:'cmd', icon:this.schema[k].icon})) }; return { suggest: '', context: 'UNKNOWN', options: [] }; }
+        let node = this.schema[cmd];
+        if (node.type === 'smart_add') {
+            const lastArg = lastCharIsSpace ? '' : tokens[tokens.length-1];
+            if (tokens.length === 1 && lastCharIsSpace) return { suggest: '', context: 'DATE', options: [{text:'today', type:'date', icon:'📅'}, {text:'yesterday', type:'date', icon:'📅'}, {text:'batch', type:'opt', icon:'📝'}] };
+            const parseState = parseOneLineInput(tokens.slice(1)); const runningTotal = parseState.currentSum; const prevToken = lastCharIsSpace ? tokens[tokens.length-1] : tokens[tokens.length-2];
+            let ctx = 'DESC'; const isPrevAmount = /^[\-\+\$]?[0-9]/.test(prevToken); const isPrevAccount = this.accounts.some(a=>prevToken.includes(a)) || prevToken.includes(':');
+            if (isPrevAmount) { ctx = 'ACC'; const matches = this.analyzeAccount(lastArg, true).options; return { suggest: matches[0]?.text.startsWith(lastArg) ? matches[0].text.substring(lastArg.length) : '', context: ctx, options: matches }; } 
+            else if (isPrevAccount) { ctx = 'AMT'; const bal = -runningTotal; const balStr = fmtNum(bal); return { suggest: '', context: ctx, options: [{text:balStr, type:'math', icon:'⚖️'}, {text:'10', type:'math', icon:'🔢'}, {text:'50', type:'math', icon:'🔢'}] }; } 
+            const accResult = this.analyzeAccount(lastArg); accResult.context = 'DESC/ACC'; return accResult;
+        }
+        while (node.type === 'branch') {
+            if (tokens.length <= 1 && !lastCharIsSpace) break; 
+            if (tokens.length === 1 && lastCharIsSpace) return { suggest: '', context: 'SUBCMD', options: Object.keys(node.branches).map(k=>({text:k, type:'opt'})) };
+            const sub = tokens[1];
+            if (tokens.length === 2 && !lastCharIsSpace) { const matches = Object.keys(node.branches).filter(k => k.startsWith(sub)); return { suggest: matches[0]?.substring(sub.length)||'', context: 'SUBCMD', options: matches.map(k=>({text:k, type:'opt'})) }; }
+            if (node.branches[sub]) { node = node.branches[sub]; tokens.shift(); } else { return { suggest: '', context: 'DONE', options: [] }; }
+        }
+        const lastArg = lastCharIsSpace ? '' : tokens[tokens.length-1];
+        if (node.strictPos) {
+            const argIdx = lastCharIsSpace ? tokens.length - 1 : tokens.length - 2; const expectedType = node.spec[argIdx]; if (!expectedType) return { suggest: '', context: 'DONE', options: [] };
+            if (expectedType === 'acc') return this.analyzeAccount(lastArg); return { suggest: '', context: 'DONE', options: [] };
+        }
+        return this.analyzeFlexible(node, lastArg, tokens);
+    },
+    analyzeAccount(frag, prioritizeAssets=false) {
+        const aliases = Object.keys(fileAliases); let all = [...new Set([...this.accounts, ...aliases])]; const lowerFrag = frag.toLowerCase();
+        all = all.sort((a,b) => {
+            const aS = a.toLowerCase().startsWith(lowerFrag); const bS = b.toLowerCase().startsWith(lowerFrag);
+            if (aS && !bS) return -1; if (bS && !aS) return 1;
+            const aP = a.toLowerCase().includes(':' + lowerFrag); const bP = b.toLowerCase().includes(':' + lowerFrag);
+            if (aP && !bP) return -1; if (bP && !aP) return 1;
+            if (prioritizeAssets) { const aAsset = a.startsWith('assets') ? 1 : 0; const bAsset = b.startsWith('assets') ? 1 : 0; return bAsset - aAsset || (this.usage[b]||0) - (this.usage[a]||0); }
+            return (this.usage[b]||0) - (this.usage[a]||0);
+        });
+        const matches = all.filter(a => a.toLowerCase().includes(lowerFrag)).slice(0, 10);
+        return { suggest: matches[0]?.startsWith(frag) ? matches[0].substring(frag.length) : '', context: 'ACC', options: matches.map(a => { const isAlias = fileAliases[a] !== undefined; return { text: a, type: 'acc', icon: isAlias ? '🏷️' : '👤' }; }) };
+    },
+    analyzeFlexible(node, frag, allTokens) {
+        const counts = { acc:0, tag:0, date:0, graph_opts:0 }; const committed = allTokens.slice(1); if (frag && !input.value.endsWith(' ')) committed.pop(); 
+        committed.forEach(t => { if (t.startsWith('tag:') || t.startsWith('#')) counts.tag++; else if (t.startsWith('type:') || t.startsWith('by:') || t==='forecast') counts.graph_opts++; else if (/\d{4}/.test(t) || ['today','yesterday'].includes(t)) counts.date++; else counts.acc++; });
+        let options = [];
+        if (node.spec.includes('graph_opts') && counts.graph_opts < (node.limits?.graph_opts||2)) {
+            const rawOpts = [ {t:'type:bar', short:'bar', icon:'📊'}, {t:'type:line', short:'line', icon:'📉'}, {t:'type:area', short:'area', icon:'🗻'}, {t:'type:donut', short:'donut', icon:'🍩'}, {t:'type:scatter', short:'scatter', icon:'🟣'}, {t:'by:month', short:'month', icon:'📆'}, {t:'by:year', short:'year', icon:'📅'}, {t:'cum', short:'cum', icon:'➕'} ];
+            rawOpts.forEach(o => { options.push({text:o.t, type:'param', icon:o.icon, isHint:false}); });
+        }
+        if (node.spec.includes('acc') && counts.acc < (node.limits?.acc||99)) { options = [...options, ...this.analyzeAccount(frag).options]; }
+        
+        if (node.type === 'view' || node.spec.includes('acc')) {
+            if ('amt'.startsWith(frag) || frag.startsWith('amt')) {
+                options.push({text:'amt:>', type:'param', icon:'💰', isHint: false});
+                options.push({text:'amt:<', type:'param', icon:'💰', isHint: false});
+                options.push({text:'amt:=', type:'param', icon:'💰', isHint: false});
+            }
+        }
+
+        if (frag) options = options.filter(o => o.text.startsWith(frag) || (o.type==='param' && o.text.includes(':'+frag)));
+        options.sort((a,b) => { if (a.type === 'param' && b.type !== 'param') return -1; if (b.type === 'param' && a.type !== 'param') return 1; return 0; });
+        return { suggest: options[0]?.text.startsWith(frag) ? options[0].text.substring(frag.length) : '', context: 'FILTER', options: options };
+    },
+    getTopCommands() { return [{text: 'tutorial', type: 'cmd', icon:'🎓'}, {text: 'dash', type: 'cmd', icon:'📊'}, {text: 'add', type: 'cmd', icon:'➕'}, {text: 'graph', type: 'cmd', icon:'📉'}, {text: 'reg', type: 'cmd', icon:'📜'}, {text: 'mount', type: 'cmd', icon:'💾'}, {text: 'assert', type: 'cmd', icon:'⚖️'}, {text: 'config', type: 'cmd', icon:'⚙️'}]; }
+};
+
+/* =========================================
+   UI EVENTS & LOGIC
    ========================================= */
 const content = document.getElementById('terminal-content');
 const container = document.getElementById('terminal-container');
@@ -486,353 +863,388 @@ const inputWrapper = document.getElementById('input-wrapper');
 const fileInput = document.getElementById('file-input');
 const ctxBadge = document.getElementById('context-badge');
 
-let wizard = null; let importMode = 'append'; let activeFilter = 'all'; 
+let wizard = null; let activeFilter = 'all'; let pendingLedgerAction = null;
 
 function log(msg, type='text') {
     const div = document.createElement('div'); div.className = `line ${type}`; div.innerHTML = msg;
-    content.appendChild(div); container.scrollTop = container.scrollHeight;
+    const frag = document.createDocumentFragment(); frag.appendChild(div);
+    content.appendChild(frag); container.scrollTop = container.scrollHeight;
 }
 
-function run(raw) {
+async function run(raw) {
     const val = raw.trim().toLowerCase();
-    if (wizard) { return Wizard.step(val); }
-    if (!val) return; 
-    log(val, 'cmd');
-    const mathRes = MathEngine.eval(val);
-    if (mathRes !== null && !ENGINE.schema[val.split(' ')[0]]) { log(`= ${mathRes}`, 'success'); return; }
-    
+    if (ConfirmationMode.active) { return ConfirmationMode.process(val); } if (wizard) { return Wizard.step(val); } if (!val) return; 
+    ENGINE.recordUsage(val.split(' ')[0]); log(escapeHtml(val), 'cmd');
+    const mathRes = MathEngine.eval(val); if (mathRes !== null && !ENGINE.schema[val.split(' ')[0]]) { log(`= ${mathRes}`, 'success'); return; }
     const parts = val.split(' '); const verb = parts[0]; const args = parts.slice(1);
+    args.forEach(arg => { if (ENGINE.accounts.includes(arg)) ENGINE.recordUsage(arg); });
 
-    if (verb === 'coa') {
-        if (args[0] === 'add') {
-            if (!args[1]) return log("Usage: coa add <name>", 'warn');
-            LedgerManager.append(`account ${args[1]}`);
-            log(`Account '${args[1]}' created.`, 'success');
-        } else if (args[0] === 'list') {
-            log(ENGINE.accounts.join('<br>'));
-        } else {
-            renderCOA(args.join(' '));
+    if (verb === 'config') {
+        const sub = args[0];
+        if (sub === 'list') { Object.entries(ConfigManager.data).forEach(([k,v]) => log(`${k} = ${v}`, 'text')); return; }
+        if (sub === 'set') { ConfigManager.set(args[1], args[2]); log(`Config ${args[1]} set to ${args[2]}`, 'success'); return; }
+        if (sub === 'strict') { const s = SETTINGS.toggleStrict(); log(`Strict Mode: ${s?'ON':'OFF'}`, s?'success':'warn'); return; }
+        if (sub === 'theme') {
+            if (args[1] === 'reset') ThemeManager.reset();
+            else if (args[1] === 'font') ThemeManager.setFont(args[2]);
+            else if (args[1] === 'bg') ThemeManager.setBg(args[2]);
+            else if (args[1] === 'text') ThemeManager.setText(args[2]);
+            else ThemeManager.setPreset(args[1]);
+            log("Theme updated.", 'success'); return;
         }
+        if (sub === 'budget') {
+            if (!args[1] || args[1] === 'list') {
+                const bals = {}; const now = new Date(); const ym = now.toISOString().slice(0, 7);
+                transactions.forEach(t => { if (!t.date.startsWith(ym)) return; t.posts.forEach(p => { if (p.acc.startsWith('expenses')) bals[p.acc] = (bals[p.acc] || 0) + p.val; }); });
+                const budgets = BudgetManager.get();
+                Object.entries(budgets).forEach(([cat, limit]) => {
+                    let spent = 0; Object.keys(bals).forEach(acc => { if (acc.includes(cat)) spent += bals[acc]; });
+                    const pct = Math.min(100, (spent / limit) * 100); let cls = 'budget-fill'; if (pct > 85) cls += ' warn'; if (spent > limit) cls += ' over';
+                    log(`<div class="budget-row"><div class="budget-label"><span>${cat}</span><span>$${spent.toFixed(0)} / $${limit}</span></div><div class="budget-track"><div class="${cls}" style="width:${pct}%"></div></div></div>`);
+                });
+            } 
+            else if (args[1] === 'rm') { ConfirmationMode.start('Remove Budget', () => { BudgetManager.remove(args[2]); log(`Removed.`, 'success'); }); return; } 
+            else if (args[1] === 'set') { BudgetManager.set(args[2], args[3]); log(`Set.`, 'success'); }
+            return;
+        }
+        log("Usage: config <set|list|strict|theme|budget>", 'system'); return;
     }
-    else if (verb === 'check') {
-        let errs = 0; transactions.forEach(t=>{ let sum=0; t.posts.forEach(p=>sum+=p.amt); if(Math.abs(sum)>0.01){errs++; log(`Txn #${t.id} unbalanced: ${sum.toFixed(2)}`,'error');}});
-        if(errs===0) log("Integrity Check Passed.",'success'); else log(`Found ${errs} errors.`,'warn');
-    }
-    else if (verb === 'bs') {
-        let assets=0, liab=0, equity=0, income=0, expenses=0; const q = args.join(' ');
-        transactions.filter(t => match(t, q)).forEach(t => {
-            t.posts.forEach(p => {
-                if (p.acc.startsWith('assets')) assets += p.amt;
-                else if (p.acc.startsWith('liabilities')) liab += p.amt;
-                else if (p.acc.startsWith('equity')) equity += p.amt;
-                else if (p.acc.startsWith('income')) income += p.amt;
-                else if (p.acc.startsWith('expenses')) expenses += p.amt;
-            });
-        });
-        const retained = income + expenses; const netWorth = assets + liab;
-        log(`<div class="pnl-head">Balance Sheet ${q?'('+q+')':''}</div><div class="pnl-row"><span>Assets</span><span style="color:var(--success)">${assets.toFixed(2)}</span></div><div class="pnl-row"><span>Liabilities</span><span style="color:var(--error)">${liab.toFixed(2)}</span></div><div class="pnl-row"><span>Equity</span><span>${equity.toFixed(2)}</span></div><div class="pnl-row"><span>Retained Earnings</span><span>${retained.toFixed(2)}</span></div><div class="pnl-row pnl-total"><span>Net Worth</span><span>${netWorth.toFixed(2)}</span></div>`);
-    }
-    else if (verb === 'man') {
-        const topic = args[0];
-        if (!topic) log("Usage: man <command>. Type 'man' to see list.", 'warn');
-        else if (MAN_PAGES[topic]) log(MAN_PAGES[topic]);
-        else log("No manual entry for " + topic, 'error');
-    }
+
+    if (verb === 'tutorial') { log(Tutorial.get(args)); }
     else if (verb === 'dash') {
-        let income = 0, expenses = 0, assets = 0; const now = new Date(); const ym = now.toISOString().slice(0, 7);
-        transactions.forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('assets')) assets += p.amt; if (t.date.startsWith(ym)) { if (p.acc.startsWith('income')) income += p.amt; if (p.acc.startsWith('expenses')) expenses += p.amt; } }); });
-        log(`<div class="dash-grid"><div class="dash-card"><div class="dash-label">Net Worth</div><div class="dash-val">$${assets.toFixed(0)}</div></div><div class="dash-card"><div class="dash-label">Burn Rate (Mo)</div><div class="dash-val" style="color:var(--error)">$${expenses.toFixed(0)}</div></div><div class="dash-card dash-row"><div class="dash-label">Income (This Month)</div><div class="dash-val" style="color:var(--success)">$${Math.abs(income).toFixed(0)}</div></div></div>`);
-    }
-    else if (verb === 'stats') {
-        const txCount = transactions.length; const accCount = ENGINE.accounts.length; const first = transactions[0]?.date || 'N/A'; const last = transactions[txCount-1]?.date || 'N/A';
-        log(`<div class="stat-row"><span>Transactions</span><span>${txCount}</span></div><div class="stat-row"><span>Accounts</span><span>${accCount}</span></div><div class="stat-row"><span>Date Range</span><span>${first} to ${last}</span></div><div class="stat-row"><span>Ledger Size</span><span>${(LedgerManager.getRaw().length/1024).toFixed(1)} KB</span></div>`);
-    }
-    else if (verb === 'rm') {
-        const id = parseInt(args[0]); if (isNaN(id)) return log("Usage: rm <id>", 'warn');
-        if (LedgerManager.delete(id)) log(`Transaction #${id} deleted.`, 'success'); else log(`ID #${id} not found.`, 'error');
-    }
-    else if (verb === 'reg') {
-        const subset = transactions.slice(-30).filter(t => match(t, args.join(' ')));
-        if (!subset.length) return log("No matches.", 'system');
-        subset.forEach(t => {
-            const posts = t.posts.map(p => `<div style="display:flex;justify-content:space-between;padding-left:10px;font-size:0.9em;opacity:0.8"><span>${p.acc}</span><span class="${p.amt<0?'neg':''}">${(p.amt||0).toFixed(2)}</span></div>`).join('');
-            log(`<div style="margin-top:10px;border-left:2px solid var(--accent);padding-left:8px;"><div style="color:var(--primary)"><span class="txn-id">#${t.id}</span>${t.date} <span style="color:var(--text)">${t.desc}</span></div>${posts}</div>`);
+        let assets = 0, liabilities = 0, inc = 0, exp = 0; let cats = {}; const now = new Date(); const ym = now.toISOString().slice(0, 7);
+        transactions.forEach(t => {
+            t.posts.forEach(p => { if (p.acc.startsWith('assets')) assets += p.val; else if (p.acc.startsWith('liabilities')) liabilities += p.val; });
+            if (t.date.startsWith(ym)) { t.posts.forEach(p => { if (p.acc.startsWith('income')) inc += p.val; else if (p.acc.startsWith('expenses')) { exp += p.val; const cat = p.acc.split(':')[1] || 'misc'; cats[cat] = (cats[cat]||0) + p.val; } }); }
         });
+        const netWorth = assets + liabilities; const monthlyNet = inc + exp; const savingsRate = inc !== 0 ? ((inc + exp) / Math.abs(inc) * 100) : 0; const topCat = Object.entries(cats).sort((a,b)=>a[1]-b[1])[0]; const activeDays = new Set(transactions.filter(t=>t.date.startsWith(ym)).map(t=>t.date)).size;
+        const html = `<div class="dash-grid"><div class="dash-card"><div class="dash-label">Net Worth</div><div class="dash-val">$${fmtNum(netWorth)}</div></div><div class="dash-card"><div class="dash-label">Net (Month)</div><div class="dash-val" style="color:${monthlyNet >= 0 ? 'var(--success)' : 'var(--error)'}">$${fmtNum(monthlyNet)}</div></div><div class="dash-card"><div class="dash-label">Savings Rate</div><div class="dash-val">${savingsRate.toFixed(1)}%</div></div><div class="dash-card"><div class="dash-label">Top Expense</div><div class="dash-val" style="color:var(--error)">${topCat ? topCat[0] : '-'}</div></div><div class="dash-card"><div class="dash-label">Active Days</div><div class="dash-val">${activeDays}</div></div><div class="dash-card"><div class="dash-label">Income</div><div class="dash-val" style="color:var(--success)">$${fmtNum(Math.abs(inc))}</div></div></div>`;
+        log(html);
     }
-    else if (verb === 'edit') window.Editor.open();
-    else if (verb === 'import') { importMode = args[0] === 'replace' ? 'replace' : 'append'; fileInput.click(); }
-    else if (verb === 'forecast') {
-        const now = new Date(); const past90 = new Date(now); past90.setDate(now.getDate() - 90); const iso90 = past90.toISOString().slice(0,10);
-        let income = 0, expenses = 0, assets = 0;
-        transactions.forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('assets')) assets += (p.amt||0); }); if (t.date >= iso90) t.posts.forEach(p => { if (p.acc.startsWith('income')) income += (p.amt||0); if (p.acc.startsWith('expenses')) expenses += (p.amt||0); }); });
-        const dailyAvg = (income+expenses)*-1 / 90; const predicted30 = assets + (dailyAvg * 30);
-        log(`<div class="pnl-head">30-Day Forecast</div><div class="pnl-row"><span>Current</span><span>$${assets.toFixed(0)}</span></div><div class="pnl-row"><span>90d Avg/Day</span><span>$${dailyAvg.toFixed(2)}</span></div><div class="pnl-row pnl-total"><span>Projected</span><span style="color:${dailyAvg>0? 'var(--success)':'var(--error)'}">$${predicted30.toFixed(0)}</span></div>`);
-    }
-    else if (verb === 'recur') {
-        const query = args.join(' '); if (!query) return log("Usage: recur <query>", 'warn');
-        const found = [...transactions].reverse().find(t => match(t, query));
-        if (!found) return log("No match.", 'error');
-        if (found.posts.length < 2) return log("Too complex.", 'warn');
-        Wizard.start({ desc: found.desc, acc1: found.posts[0].acc, amt: Math.abs(found.posts[0].amt).toFixed(2), acc2: found.posts[1].acc });
-        log(`Recurring: ${found.desc}`, 'success');
-    }
-    else if (verb === 'budget') {
-        if (!args[0]) {
-            const bals = {}; const now = new Date(); const ym = now.toISOString().slice(0, 7);
-            transactions.forEach(t => { if (!t.date.startsWith(ym)) return; t.posts.forEach(p => { if (p.acc.startsWith('expenses')) bals[p.acc] = (bals[p.acc] || 0) + (p.amt||0); }); });
-            const budgets = BudgetManager.get(); if (Object.keys(budgets).length === 0) return log("No budgets set.", 'warn');
-            Object.entries(budgets).forEach(([cat, limit]) => {
-                let spent = 0; Object.keys(bals).forEach(acc => { if (acc.includes(cat)) spent += bals[acc]; });
-                const pct = Math.min(100, (spent / limit) * 100); let cls = 'budget-fill'; if (pct > 85) cls += ' warn'; if (spent > limit) cls += ' over';
-                log(`<div class="budget-row"><div class="budget-label"><span>${cat}</span><span>$${spent.toFixed(0)} / $${limit}</span></div><div class="budget-track"><div class="${cls}" style="width:${pct}%"></div></div></div>`);
+    else if (verb === 'mount') { await Persistence.mount(); }
+    else if (verb === 'pwa') { if(args[0] === 'install') { PwaManager.install(); } else { log("Use 'pwa install' to generate offline files.", 'system'); } }
+    else if (verb === 'check') {
+        let errors = 0; 
+
+        // 1. Check for broken transactions (Unbalanced)
+        transactions.forEach(t => {
+            if (t._error) {
+                log(`FAIL Transaction ${t.date} "${t.desc}": ${t._error}`, 'error');
+                errors++;
+            }
+        });
+        
+        // 2. Check assertions (Logic from V23.38)
+        const sortedEvents = [];
+        transactions.forEach(t => {
+            t.posts.forEach(p => {
+                sortedEvents.push({ type: 'post', date: t.date, acc: p.acc, val: p.val, comm: p.comm || '' });
             });
-        } else if (args[0] === 'rm') { BudgetManager.remove(args[1]); log(`Removed.`, 'success'); }
-        else if (args[1]) { BudgetManager.set(args[0], args[1]); log(`Set.`, 'success'); }
+        });
+        assertions.forEach(a => {
+            sortedEvents.push({ type: 'assert', date: a.date, acc: a.acc, val: a.val, comm: a.comm || '' });
+        });
+        sortedEvents.sort((a,b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            if (a.type === 'post' && b.type === 'assert') return -1;
+            if (a.type === 'assert' && b.type === 'post') return 1;
+            return 0;
+        });
+
+        const balances = {};
+        sortedEvents.forEach(e => {
+            const key = e.acc + '|' + e.comm;
+            if (e.type === 'post') {
+                balances[key] = (balances[key] || 0) + e.val;
+            } else if (e.type === 'assert') {
+                const current = balances[key] || 0;
+                if (Math.abs(current - e.val) > 0.01) {
+                    log(`FAIL Assertion ${e.date} ${e.acc}: Expected ${fmtNum(e.val)} ${e.comm}, got ${fmtNum(current)}`, 'error');
+                    errors++;
+                }
+            }
+        });
+
+        if (errors === 0) log("All checks passed.", 'success');
+        else log(`Found ${errors} errors.`, 'warn');
+    }
+    else if (verb === 'account') { if (args[0] === 'add') { if (LedgerManager.addAccount(args[1])) log(`Account ${args[1]} added.`, 'success'); else log("Exists or invalid.", 'warn'); } }
+    else if (verb === 'graph') { log(GraphEngine.generate(transactions, args)); }
+    else if (verb === 'stats') { log(`<div class="stat-row"><span>Txns</span><span>${transactions.length}</span></div><div class="stat-row"><span>Accounts</span><span>${ENGINE.accounts.length}</span></div><div class="stat-row"><span>Assertions</span><span>${assertions.length}</span></div>`); }
+    else if (verb === 'rm') { const id = parseInt(args[0]); ConfirmationMode.start(`Delete Transaction #${id}`, () => { if (LedgerManager.delete(id)) log(`Deleted #${id}.`, 'success'); else log(`ID #${id} not found.`, 'error'); }); }
+    else if (verb === 'reg') {
+        const subset = transactions.filter(t => match(t, args.join(' ')));
+        if (!subset.length) return log("No matches.", 'system');
+        let runningBal = 0; const targetAcc = args.find(a => !a.includes(':') && ENGINE.accounts.some(acc => acc.includes(a)));
+        let html = `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Date</th><th>Desc</th><th>Account</th><th class="num">Amt</th>${targetAcc ? '<th class="num">Bal</th>' : ''}</tr></thead><tbody>`;
+        subset.forEach(t => {
+            t.posts.forEach(p => {
+                if (match({...t, posts:[p]}, args.join(' '))) { 
+                    if (targetAcc && p.acc.includes(targetAcc)) runningBal += p.val;
+                    const color = p.val > 0 ? 'var(--text)' : 'var(--error)';
+                    html += `<tr><td>${t.date}</td><td>${t.desc.substring(0,20)}</td><td>${p.acc}</td><td class="num" style="color:${color}">${fmtNum(p.val)}</td>${targetAcc ? `<td class="num">${fmtNum(runningBal)}</td>` : ''}</tr>`;
+                }
+            });
+        });
+        html += '</tbody></table></div>'; log(html);
+    }
+    else if (verb === 'edit') { ConfirmationMode.start('Manual Raw Editor', () => Editor.open()); }
+    else if (verb === 'recur') {
+        const query = args.join(' '); const found = [...transactions].reverse().find(t => match(t, query));
+        if (found) { Wizard.start({ desc: found.desc, acc1: found.posts[0].acc, amt: Math.abs(found.posts[0].val).toFixed(2), acc2: found.posts[1].acc }); log(`Recurring: ${found.desc}`, 'success'); } else log("No match.", 'error');
     }
     else if (verb === 'alias') {
-        if (!args[0] || args[0] === 'list') { const list = AliasManager.list(); if(Object.keys(list).length === 0) log("No aliases.", 'system'); else Object.entries(list).forEach(([k,v]) => log(`${k} -> ${v}`, 'text')); }
-        else if (args[0] === 'rm') { AliasManager.remove(args[1]); log(`Removed.`, 'success'); }
-        else if (args[1]) { AliasManager.set(args[0], args[1]); log(`Saved.`, 'success'); }
+        if (args[0] === 'add') { LedgerManager.addAlias(args[1], args[2]); log(`Alias ${args[1]} added to file.`, 'success'); }
+        else if (args[0] === 'list') { Object.entries(fileAliases).forEach(([k,v]) => log(`${k} = ${v}`, 'text')); }
     }
     else if (verb === 'undo') {
-        const raw = LedgerManager.getRaw(); const blocks = raw.trim().split(/\n\s*\n/);
-        if (blocks.length <= 1) return log("Nothing to undo.", 'warn');
-        blocks.pop(); LedgerManager.save(blocks.join('\n\n') + '\n'); LedgerManager.load(); log("Undone.", 'success');
+        if (transactions.length === 0) { log("Nothing to undo.", 'warn'); return; }
+        // Safe Undo: Remove last ID from memory, then reconstruct.
+        transactions.pop();
+        const safeRaw = reconstructFile();
+        LedgerManager.save(safeRaw);
+        LedgerManager.loadRaw(safeRaw);
+        log("Undone last entry.", 'success');
     }
+    else if (verb === 'assert') { if (args.length >= 2) { LedgerManager.addAssertion(args[0], args[1]); log(`Assertion added for ${args[0]}.`, 'success'); } else log("Usage: assert <acc> <amount>", 'error'); }
     else if (verb === 'pnl') {
         const q = args.join(' '); let inc = 0, exp = 0;
-        transactions.filter(t => match(t, q)).forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('income')) inc += (p.amt||0); if (p.acc.startsWith('expenses')) exp += (p.amt||0); }); });
-        const net = inc + exp; 
-        log(`<div class="pnl-head">P&L ${q?`(${q})`:''}</div>`);
-        log(`<div class="pnl-row"><span>Income</span><span style="color:var(--success)">${inc.toFixed(2)}</span></div>`);
-        log(`<div class="pnl-row"><span>Expenses</span><span style="color:var(--error)">${exp.toFixed(2)}</span></div>`);
-        log(`<div class="pnl-row pnl-total"><span>Net</span><span style="color:${net<0?'var(--success)':'var(--text)'}">${net.toFixed(2)}</span></div>`);
+        transactions.filter(t => match(t, q)).forEach(t => { t.posts.forEach(p => { if (p.acc.startsWith('income')) inc += p.val; if (p.acc.startsWith('expenses')) exp += p.val; }); });
+        log(`<div class="pnl-head">P&L ${q?`(${q})`:''}</div><div class="pnl-row"><span>Income</span><span style="color:var(--success)">${fmtNum(inc)}</span></div><div class="pnl-row"><span>Expenses</span><span style="color:var(--error)">${fmtNum(exp)}</span></div><div class="pnl-row pnl-total"><span>Net</span><span>${fmtNum(inc+exp)}</span></div>`);
     }
-    else if (verb === 'theme') {
-        if (args[0] === 'reset') { ThemeManager.reset(); log("Theme reset.", 'success'); }
-        else if (args[0] === 'font') { ThemeManager.setFont(args[1]); log("Font set.", 'success'); }
-        else if (args[0] === 'bg') { ThemeManager.setBg(args[1]); log("BG set.", 'success'); }
-        else if (args[0] === 'text') { ThemeManager.setText(args[1]); log("Text set.", 'success'); }
-        else if (args[0]) { ThemeManager.setPreset(args[0]); log(`Theme: ${args[0]}`, 'success'); }
+    else if (verb === 'ledger') { 
+        if(args[0] === 'import') { pendingLedgerAction='import'; document.getElementById('file-input').click(); }
+        else if(args[0] === 'merge') { pendingLedgerAction='merge'; document.getElementById('file-input').click(); }
+        else if(args[0] === 'reset') { ConfirmationMode.start('Reset Ledger', () => { LedgerManager.reset(); }); }
+        else if(args[0]==='new'||args[0]==='switch') LedgerManager.switch(args[1]); 
+        else log(LedgerManager.list().join(', '), 'system'); 
     }
-    else if (verb === 'strict') { const s = SETTINGS.toggleStrict(); log(`Strict: ${s?'ON':'OFF'}`, s?'success':'warn'); }
-    else if (verb === 'ledger') { if(args[0]==='new'||args[0]==='switch') LedgerManager.switch(args[1]); else log(LedgerManager.list().join(', '), 'system'); }
     else if (verb === 'bal') {
-        const b = {}; transactions.filter(t=>match(t, args.join(' '))).forEach(t=>t.posts.forEach(p=>b[p.acc]=(b[p.acc]||0)+(p.amt||0)));
+        const b = {}; transactions.filter(t=>match(t, args.join(' '))).forEach(t=>t.posts.forEach(p=>b[p.acc]=(b[p.acc]||0)+p.val));
         Object.keys(b).sort().forEach(k=>Math.abs(b[k])>0.01 && logRow(k, b[k]));
     }
-    else if (verb === 'graph') {
-        const type = args[0]; const filter = args.slice(1).join(' '); const b = {};
-        if (type === 'pie') {
-            let total = 0; const filterStr = filter || 'expenses';
-            transactions.filter(t => match(t, filterStr)).forEach(t => { t.posts.forEach(p => { if (p.acc.includes(filterStr)) { b[p.acc] = (b[p.acc]||0) + (p.amt||0); total += (p.amt||0); } }); });
-            const sorted = Object.entries(b).sort((a,b) => b[1] - a[1]).slice(0, 5); if (sorted.length === 0) return log("No data.", 'warn');
-            let svg = `<svg viewBox="-1 -1 2 2" style="transform: rotate(-90deg); width:150px; height:150px;">`; let cum = 0; const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
-            sorted.forEach(([k,v], i) => { const percent = v / total; const start = cum * 2 * Math.PI; const end = (cum + percent) * 2 * Math.PI; const x1 = Math.cos(start), y1 = Math.sin(start); const x2 = Math.cos(end), y2 = Math.sin(end); const large = percent > 0.5 ? 1 : 0; const d = `M 0 0 L ${x1} ${y1} A 1 1 0 ${large} 1 ${x2} ${y2} Z`; svg += `<path d="${d}" fill="${colors[i%colors.length]}"></path>`; cum += percent; }); svg += `</svg>`;
-            let legend = `<div style="font-size:11px; margin-left:10px;">`; sorted.forEach(([k,v], i) => { legend += `<div style="display:flex;align-items:center;margin-bottom:2px;"><div style="width:8px;height:8px;background:${colors[i%colors.length]};margin-right:6px;border-radius:50%"></div><span style="flex:1;opacity:0.8">${k.split(':').pop()}</span><span>${Math.round((v/total)*100)}%</span></div>`; }); legend += `</div>`;
-            log(`<div style="margin:10px 0; padding:10px; background:var(--panel); border-radius:8px; display:flex; align-items:center;">${svg}${legend}</div>`);
-        } else {
-            const isExp = (type === 'exp'); const fStr = filter || (isExp?'expenses':''); transactions.filter(t=>match(t, fStr)).forEach(t=>t.posts.forEach(p=>b[p.acc]=(b[p.acc]||0)+(p.amt||0)));
-            const entries = Object.entries(b).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5); 
-            const max = entries[0]?.[1]||1;
-            log(`<div style="margin:10px 0;border:1px solid var(--accent);padding:10px;border-radius:8px"><div style="color:var(--accent);font-size:11px;margin-bottom:5px">graph: ${fStr}</div>${entries.map(e=>`<div style="display:flex;align-items:center;margin:4px 0;font-size:11px"><div style="width:60px;overflow:hidden;text-align:right;margin-right:8px">${e[0].split(':').pop()}</div><div style="flex:1;background:var(--bg);height:10px;border:1px solid var(--accent)"><div style="height:100%;background:var(--primary);width:${(e[1]/max)*100}%"></div></div><div style="width:40px;text-align:right">${Math.round(e[1])}</div></div>`).join('')}</div>`);
-        }
-    }
+    else if (verb === 'coa') { renderCOA(args.join(' ')); }
     else if (verb === 'export') {
         const rawData = LedgerManager.getRaw();
-        if (args[0] === 'copy') { navigator.clipboard.writeText(rawData).then(() => log("Copied.", 'success')); } 
-        else { const blob = new Blob([rawData], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ledger_${new Date().toISOString().split('T')[0]}.hledger`; a.click(); log("Downloaded.", 'success'); }
+        if (args[0] === 'copy') { navigator.clipboard.writeText(rawData).then(() => log("Copied.", 'success')); }
+        else if (args[0] === 'csv') {
+            let csv = "Date,Description,Account,Amount,Comment\n";
+            transactions.forEach(t => {
+                t.posts.forEach(p => {
+                    const row = [t.date, `"${t.desc.replace(/"/g, '""')}"`, p.acc, p.val, `"${(p.comment||'').trim()}"`];
+                    csv += row.join(",") + "\n";
+                });
+            });
+            const blob = new Blob([csv], {type: 'text/csv'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `hledger_export.csv`; a.click(); log("CSV Exported.", 'success');
+        }
+        else { const blob = new Blob([rawData], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ledger.hledger`; a.click(); log("Downloaded.", 'success'); ConfigManager.resetTxnCount(); }
     }
-    else if (verb === 'add') { Wizard.start(); }
+    else if (verb === 'add') { 
+        if(args.length === 0) Wizard.start();
+        else if(args[0] === 'batch') Editor.open('batch');
+        else tryOneLineAdd(args);
+    }
     else if (verb === 'clear') { content.innerHTML = ''; }
-    else if (verb === 'help') { log("edit, rm, dash, stats, import, forecast, budget, recur, undo, pnl, alias, bal, reg, coa, graph, strict, export, add, ledger, theme", 'system'); }
+    else if (verb === 'help') {
+        const h = (cat, cmds) => `<div class="help-cat">${cat}</div>` + cmds.map(c => `<div class="help-cmd"><span>${c[0]}</span><span>${c[1]}</span></div>`).join('');
+        let html = h('LEARN', [['tutorial', 'Launch interactive guide'],['tutorial [cmd]', 'Specific help']]);
+        html += h('VIEWS', [['dash', 'Dashboard'],['graph <filter>', 'Charts'],['reg <filter>', 'Register'],['bal <filter>', 'Balances'],['pnl <filter>', 'Income Statement']]);
+        html += h('ACTIONS', [['add', 'Wizard'],['add <line>', 'Quick Add'],['edit', 'Editor'],['undo', 'Revert'],['mount', 'Load file'],['export', 'Save']]);
+        log(html);
+    }
     else { log("unknown command.", 'error'); }
 }
 
+function parseOneLineInput(args) {
+    let date = new Date().toISOString().split('T')[0]; let idx = 0;
+    if (args.length > 0 && args[0].match(/^\d{4}-\d{2}-\d{2}$/)) { if (!isNaN(Date.parse(args[0]))) { date = args[0]; idx++; } } 
+    else if (args.length > 0 && args[0] === 'today') { idx++; }
+    else if (args.length > 0 && args[0] === 'yesterday') { const d = new Date(); d.setDate(d.getDate()-1); date = d.toISOString().split('T')[0]; idx++; }
+    const finalPostings = []; let amtBuffer = null; let runningTotal = 0; let i = args.length - 1;
+    while (i >= idx) {
+        const token = args[i]; const isAmt = /^[\-\+\$]?[0-9]/.test(token); const isAcc = token.includes(':') || fileAliases[token] || ENGINE.accounts.includes(token) || isValidRoot(token);
+        if (isAmt) { if (amtBuffer !== null) break; amtBuffer = token; } 
+        else if (isAcc) {
+            let accName = token; if (fileAliases[accName]) accName = fileAliases[accName];
+            let p = { acc: accName, val: 0, isImplicit: true };
+            if (amtBuffer) { const parsed = parseCommodity(amtBuffer); p.val = parsed.val; p.comm = parsed.comm; p.pos = parsed.pos; p.isImplicit = false; runningTotal += parsed.val; amtBuffer = null; }
+            finalPostings.unshift(p);
+        } else { break; } i--;
+    }
+    const desc = args.slice(idx, i + 1).join(' '); return { date, desc, postings: finalPostings, currentSum: runningTotal };
+}
+
+function tryOneLineAdd(args) {
+    const parsed = parseOneLineInput(args);
+    if (parsed.postings.length === 0) { log("Error: No accounts found.", 'error'); return; }
+    if (!parsed.desc) { parsed.desc = "Transaction"; }
+    
+    const txn = { id: transactions.length, date: parsed.date, desc: parsed.desc, posts: [] };
+    parsed.postings.forEach(p => {
+        let rawAmt = '';
+        if (!p.isImplicit) {
+             rawAmt = p.pos === 'left' ? p.comm + p.val : p.val + p.comm;
+        }
+        txn.posts.push({ acc: p.acc, rawAmt: rawAmt, isImplicit: p.isImplicit, val: p.val, comm: p.comm, pos: p.pos });
+    });
+
+    try {
+        const finalTxn = finalize(txn, transactions.length, true); // Strict Mode for new entries
+        transactions.push(finalTxn); 
+        LedgerManager.save(reconstructFile()); 
+        LedgerManager.loadRaw(reconstructFile()); 
+        log(`Added: ${parsed.date} ${parsed.desc}`, 'success'); 
+        ConfigManager.incTxnCount(); 
+        ConfigManager.checkBackup();
+    } catch(e) {
+        log(`Error: ${e.message}`, 'error');
+    }
+}
+
+function logRow(label, val) { log(`<div style="display:flex;justify-content:space-between;font-size:0.95em"><span>${label}</span><span>${fmtNum(val)}</span></div>`); }
+
+function renderCOA(filter) {
+    const roots = {}; ENGINE.accounts.filter(a => !filter || a.includes(filter)).forEach(acc => { const parts = acc.split(':'); let curr = roots; parts.forEach((part) => { if (!curr[part]) curr[part] = { _val: 0, _name: part, _children: {} }; curr = curr[part]._children; }); });
+    const printTree = (node, depth) => { Object.values(node).sort((a,b)=>a._name.localeCompare(b._name)).forEach(n => { log(`<div style="margin-left:${depth*12}px" class="${Object.keys(n._children).length?'tree-node':'tree-leaf'}">${n._name}</div>`); printTree(n._children, depth + 1); }); };
+    log(`<div class="pnl-head">Chart of Accounts</div>`); printTree(roots, 0);
+}
+
 /* =========================================
-   WIZARD
+   WIZARD (PATCHED)
    ========================================= */
 const Wizard = {
     state: 0, postings: [], data: {},
-    start(seedData = {}) { 
-        this.state = 0; this.postings = []; this.data = {...seedData};
-        wizard = this; document.body.classList.add('wizard-mode');
-        this.ask();
-    },
+    start(seedData = {}) { this.state = 0; this.postings = []; this.data = {...seedData}; wizard = this; document.body.classList.add('wizard-mode'); this.ask(); },
     ask() {
-        document.getElementById('prompt-char').innerText = '?';
-        if (this.state === 0) { log("Date? [Today]", 'system'); input.placeholder = new Date().toISOString().split('T')[0]; }
-        else if (this.state === 1) { log("Description?", 'system'); input.placeholder = this.data.desc || ''; }
-        else if (this.state === 2) {
-            this.renderDraft();
-            const pIdx = Math.floor(this.postings.length / 2);
-            const isAcc = this.postings.length % 2 === 0;
-            if (isAcc) {
-                if (this.postings.length >= 2 && Math.abs(this.getBalance()) < 0.01) log(`Balanced. Enter to Save or Add Account ${pIdx+1}.`, 'system');
-                else log(`Account ${pIdx+1}?`, 'system');
-            } else {
-                const bal = this.getBalance();
-                log(`Amount ${pIdx+1}? [${bal !== 0 ? (bal * -1).toFixed(2) : ''}]`, 'system');
-                input.placeholder = bal !== 0 ? (bal * -1).toFixed(2) : '';
-            }
-        }
-        else if (this.state === 3) { this.renderDraft(); log("Save Transaction? (Y/n)", 'system'); }
+        document.getElementById('prompt-char').innerText = '?'; const inp = document.getElementById('cmd-input');
+        if (this.state === 0) { log("Date? [Today]", 'system'); input.placeholder = new Date().toISOString().split('T')[0]; inp.inputMode = 'numeric'; }
+        else if (this.state === 1) { log("Description?", 'system'); input.placeholder = this.data.desc || ''; inp.inputMode = 'text'; }
+        else if (this.state === 2) { this.renderDraft(); const pIdx = Math.floor(this.postings.length / 2); const isAcc = this.postings.length % 2 === 0; if (isAcc) { log(`Account ${pIdx+1}?`, 'system'); inp.inputMode = 'text'; } else { log(`Amount ${pIdx+1}?`, 'system'); inp.inputMode = 'decimal'; } }
+        else if (this.state === 3) { this.renderDraft(); log("Save Transaction? (Y/n)", 'system'); inp.inputMode = 'text'; }
         activeFilter = 'all'; updateContextBadge([]);
     },
-    renderDraft() {
-        let html = `<div class="draft-box"><div class="draft-head">${this.data.date || '...'} ${this.data.desc || ''}</div>`;
-        for (let i=0; i<this.postings.length; i+=2) html += `<div class="draft-row"><span>${this.postings[i]}</span><span>${this.postings[i+1] || '...'}</span></div>`;
-        log(html + `</div>`);
-    },
+    renderDraft() { let html = `<div class="draft-box"><div class="draft-head">${this.data.date || '...'} ${this.data.desc || ''}</div>`; for (let i=0; i<this.postings.length; i+=2) { html += `<div class="draft-row"><span>${this.postings[i]}</span><span>${this.postings[i+1] || '...'}</span></div>`; } html += `</div>`; log(html); },
     step(val) {
-        if (this.state === 0) { this.data.date = val || new Date().toISOString().split('T')[0]; this.state = 1; this.ask(); return; }
+        if (val === 'cancel') { log("Cancelled.", 'warn'); this.close(); return; }
+        if (this.state === 0) {
+            if (!val || val === 'today') val = new Date().toISOString().split('T')[0];
+            else if (val === 'yesterday') { const d = new Date(); d.setDate(d.getDate()-1); val = d.toISOString().split('T')[0]; }
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return log("Format: YYYY-MM-DD", 'error');
+            this.data.date = val; this.state = 1; this.ask(); return; 
+        }
         if (this.state === 1) { this.data.desc = val || 'Transaction'; this.state = 2; this.ask(); return; }
         if (this.state === 2) {
             const isAcc = this.postings.length % 2 === 0;
             if (isAcc) {
-                if (!val) {
-                    if (this.postings.length >= 2 && Math.abs(this.getBalance()) < 0.01) { this.state = 3; this.ask(); return; }
-                }
-                if (!val) return;
-                val = AliasManager.resolve(val);
-                if (SETTINGS.strictMode && !ENGINE.accounts.includes(val)) { log(`Strict: '${val}' unknown.`, 'error'); return; }
-                this.postings.push(val); this.ask();
-            } else {
-                let amt = val;
-                if (!amt) {
-                    const bal = this.getBalance();
-                    if (Math.abs(bal) > 0.001) amt = (bal * -1).toFixed(2);
-                    else return;
-                }
-                const m = MathEngine.eval(amt); if (m) amt = m;
-                this.postings.push(amt); this.ask();
-            }
-            return;
+                if (!val && this.postings.length >= 2) { this.state = 3; this.ask(); return; }
+                if (!val) return; 
+                if (fileAliases[val]) val = fileAliases[val];
+                if (SETTINGS.strictMode && !allowedAccounts.has(val)) { if (isValidRoot(val)) { log(`Strict: Will add new account '${val}'`, 'warn'); } else { log(`Strict Error: '${val}' root invalid.`, 'error'); return; } }
+                this.postings.push(val); ENGINE.recordUsage(val); this.ask();
+            } else { this.postings.push(val); this.ask(); } return;
         }
         if (this.state === 3) {
-            if (['n','no','cancel'].includes(val)) {
-                log("Cancelled.", 'warn'); wizard = null; document.body.classList.remove('wizard-mode'); document.getElementById('prompt-char').innerText = '$'; input.placeholder = ''; return;
-            }
-            let out = `\n${this.data.date} ${this.data.desc}\n`;
-            for (let i=0; i<this.postings.length; i+=2) out += `    ${this.postings[i]}    $${this.postings[i+1]}\n`;
-            LedgerManager.save(localStorage.getItem('HL_DATA_'+LedgerManager.current) + out);
-            LedgerManager.load(); log("Saved.", 'success');
-            wizard = null; document.body.classList.remove('wizard-mode'); document.getElementById('prompt-char').innerText = '$'; input.placeholder = '';
-        }
-        updatePrediction();
+            if (['y','yes',''].includes(val)) {
+                
+                this.postings.forEach((p, i) => { if(i%2===0 && SETTINGS.strictMode && !allowedAccounts.has(p)) LedgerManager.addAccount(p); });
+                const txn = { id: transactions.length, date: this.data.date, desc: this.data.desc, posts: [] };
+                for(let i=0; i<this.postings.length; i+=2) { const acc = this.postings[i]; const raw = this.postings[i+1]; const parsed = parseCommodity(raw); txn.posts.push({ acc: acc, rawAmt: raw, isImplicit: raw==='', val: parsed.val, comm: parsed.comm, pos: parsed.pos }); }
+                
+                try {
+                    const finalTxn = finalize(txn, transactions.length, true); // Strict
+                    transactions.push(finalTxn);
+                    LedgerManager.save(reconstructFile());
+                    LedgerManager.loadRaw(reconstructFile());
+                    log("Saved.", 'success');
+                    ConfigManager.incTxnCount();
+                    ConfigManager.checkBackup();
+                    this.close();
+                } catch(e) {
+                    log(`Error: ${e.message}`, 'error');
+                    this.state = 2; // Return to editing
+                    this.ask();
+                }
+            } else if (['n','no'].includes(val)) { log("Cancelled.", 'warn'); this.close(); } else { log("Type 'yes' or 'no'", 'warn'); }
+        } updatePrediction();
     },
-    getBalance() { let sum = 0; for (let i=1; i<this.postings.length; i+=2) sum += parseFloat(this.postings[i]); return sum; },
+    close() { wizard = null; document.body.classList.remove('wizard-mode'); document.getElementById('prompt-char').innerText = '$'; input.placeholder = ''; input.inputMode = 'text'; },
     getSuggs(val) {
-        if (this.state === 0) return ['today', 'yesterday'].map(d=>({text:d, type:'date'}));
+        let res = [];
+        if (this.state === 0) res = ['today', 'yesterday'].map(d=>({text:d, type:'date'}));
         if (this.state === 2) {
-            if (this.postings.length % 2 === 0) return ENGINE.accounts.filter(a=>a.includes(val)).map(a=>({text:a, type:'acc'}));
+            const isAcc = this.postings.length % 2 === 0;
+            if (isAcc) { res = ENGINE.analyzeAccount(val).options; } 
+            else {
+                let sum = 0; let dominantComm = { comm: '', pos: '' };
+                for (let i = 1; i < this.postings.length; i += 2) { const parsed = parseCommodity(this.postings[i]); sum += parsed.val; if (parsed.comm) dominantComm = { comm: parsed.comm, pos: parsed.pos }; }
+                const bal = -sum;
+                if (bal !== 0) { let s = fmtNum(bal); if (dominantComm.comm) s = dominantComm.pos === 'left' ? dominantComm.comm + s : s + ' ' + dominantComm.comm; res = [{ text: s, type: 'math' }]; }
+            }
         }
-        if (this.state === 3) return [{text:'yes',type:'opt'}, {text:'no',type:'opt'}];
-        return [];
+        if (this.state === 3) res = [{text:'yes',type:'opt'}, {text:'no',type:'opt'}];
+        res.push({text:'cancel', type:'opt', icon:'❌'});
+        return res;
     }
 };
 
-function renderCOA(filter) {
-    // Render full tree even if filter matches children
-    const accounts = ENGINE.accounts; 
-    // If filter, we only show nodes that match or have matching children
-    const tree = {};
-    accounts.forEach(acc => { 
-        if (filter && !acc.includes(filter)) return; // Basic filtering
-        const parts = acc.split(':'); let curr = tree; 
-        parts.forEach(p => { if (!curr[p]) curr[p] = {}; curr = curr[p]; }); 
-    });
-    
-    function buildTreeHtml(node, depth = 0, prefix = '') {
-        let html = ''; const keys = Object.keys(node).sort();
-        keys.forEach(k => { 
-            const fullPath = prefix ? prefix + ':' + k : k;
-            const isLeaf = Object.keys(node[k]).length === 0;
-            const isExplicit = definedAccounts.has(fullPath);
-            const cls = isExplicit ? 'tree-name explicit' : 'tree-name';
-            const action = `onclick="fill('${fullPath}')"`;
-            html += `<div class="tree-item" style="margin-left:${depth * 12}px">
-                <span class="tree-marker">└</span>
-                <span class="${cls}" ${action}>${k}</span>
-            </div>`;
-            html += buildTreeHtml(node[k], depth + 1, fullPath);
-        });
-        return html;
-    }
-    
-    const html = buildTreeHtml(tree);
-    if (!html) return log("No accounts found.", 'warn');
-    log(`<div class="tree-container">${html}</div>`);
-}
-function logRow(k, v) { log(`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--panel);padding:2px 0"><span style="opacity:0.9">${k}</span><span style="font-weight:bold;color:${v<0?'var(--error)':'var(--text)'}">$${v.toFixed(2)}</span></div>`); }
-
 /* =========================================
-   CONTEXT LOGIC
+   UI EVENTS & PREDICT
    ========================================= */
 const availableContexts = ['all', 'acc', 'date', 'cmd', 'param'];
-function cycleContext() {
-    const currIdx = availableContexts.indexOf(activeFilter);
-    activeFilter = availableContexts[(currIdx + 1) % availableContexts.length];
-    input.focus(); updatePrediction();
-}
+function cycleContext() { const currIdx = availableContexts.indexOf(activeFilter); activeFilter = availableContexts[(currIdx + 1) % availableContexts.length]; input.focus(); updatePrediction(); }
 function updateContextBadge(options) {
-    const types = new Set(options.map(o => o.type));
-    if (types.size <= 1) {
-        if (types.size === 1) {
-            const t = [...types][0].toUpperCase(); ctxBadge.innerText = `[${t}]`; ctxBadge.classList.remove('hidden');
-            if (activeFilter !== 'all') activeFilter = 'all';
-        } else ctxBadge.classList.add('hidden');
-    } else { ctxBadge.innerText = `[${activeFilter.toUpperCase()}]`; ctxBadge.classList.remove('hidden'); }
+    if (wizard) { ctxBadge.innerText = "WIZARD"; ctxBadge.classList.remove('hidden'); return; }
+    if (activeFilter !== 'all') { ctxBadge.innerText = activeFilter.toUpperCase(); ctxBadge.classList.remove('hidden'); return; }
+    const pred = ENGINE.predict(input.value); const context = pred.context || 'CMD'; ctxBadge.innerText = context; ctxBadge.classList.remove('hidden');
 }
 
-/* =========================================
-   PREDICTION RENDERER
-   ========================================= */
 let ghostSuffix = '';
 function updatePrediction() {
-    input.value = input.value.toLowerCase(); const val = input.value; const mathRes = MathEngine.eval(val);
-    let options = [];
-    if (wizard) { 
-        ghost.innerText = ''; tabBtn.classList.remove('visible'); options = Wizard.getSuggs(val); 
-        if (Wizard.state === 2 && Wizard.postings.length % 2 !== 0) {
-            const bal = Wizard.getBalance();
-            if (Math.abs(bal) > 0.001) { const fix = (bal * -1).toFixed(2); options.unshift({ text: fix, type: 'math' }); }
-        }
-    } 
-    else {
-        const result = ENGINE.predict(val); ghostSuffix = result.suggest;
-        if (ghostSuffix) { tabBtn.classList.add('visible'); ghost.innerHTML = `<span style="opacity:0">${val}</span>` + ghostSuffix; } 
-        else { tabBtn.classList.remove('visible'); ghost.innerHTML = ''; }
-        options = result.options;
+    input.value = input.value.toLowerCase(); const val = input.value; 
+    
+    // MATH ENGINE: Check whole string or last token
+    let mathRes = MathEngine.eval(val);
+    if (mathRes === null && val.includes(' ')) {
+        const lastToken = val.split(' ').pop();
+        mathRes = MathEngine.eval(lastToken);
     }
+
+    let options = [];
+    if (wizard) { ghost.innerText = ''; tabBtn.classList.remove('visible'); options = Wizard.getSuggs(val); } 
+    else if (ConfirmationMode.active) { ghost.innerText = ''; tabBtn.classList.remove('visible'); options = [{text: ConfirmationMode.targetWord, type:'opt', icon:'✅'}, {text: 'cancel', type:'opt', icon:'❌'}]; } 
+    else { const result = ENGINE.predict(val); ghostSuffix = result.suggest; if (ghostSuffix) { tabBtn.classList.add('visible'); ghost.innerHTML = `<span style="opacity:0">${val}</span>` + ghostSuffix; } else { tabBtn.classList.remove('visible'); ghost.innerHTML = ''; } options = result.options; }
     updateContextBadge(options);
+    if (options.length === 0 && !val) options = ENGINE.getTopCommands();
+    else if (options.length === 0 && val && !wizard && !ConfirmationMode.active) options = ENGINE.analyzeAccount(val).options.slice(0, 5);
     const filtered = activeFilter === 'all' ? options : options.filter(o => o.type === activeFilter);
     let html = '';
-    if (mathRes && !ENGINE.schema[val.split(' ')[0]]) html += `<div class="chip math" onmousedown="event.preventDefault()" onclick="fill('${mathRes}')">= ${mathRes}</div>`;
-    html += filtered.slice(0, 10).map(opt => {
-        if (opt.type === 'math') return `<div class="chip math" onmousedown="event.preventDefault()" onclick="fill('${opt.text}')">Bal: ${opt.text}</div>`;
-        if (opt.isHint) return `<div class="chip hint" onmousedown="event.preventDefault()">${opt.text}</div>`;
-        return `<div class="chip" onmousedown="event.preventDefault()" onclick="completeChip('${opt.text}')">${opt.text}</div>`;
-    }).join('');
+    // MATH CHIP (Smart Context)
+    if (mathRes !== null) {
+        html += `<div class="chip math" onmousedown="event.preventDefault()" onclick="applyMath('${mathRes}')">= ${mathRes}</div>`;
+    }
+    
+    html += filtered.slice(0, 10).map(opt => { const icon = opt.icon ? `<i>${opt.icon}</i>` : ''; if (opt.isHint) return `<div class="chip hint" onmousedown="event.preventDefault()">${icon}${opt.text}</div>`; return `<div class="chip" onmousedown="event.preventDefault()" onclick="completeChip('${opt.text}')">${icon}${opt.text}</div>`; }).join('');
     suggs.innerHTML = html;
 }
 
-window.acceptGhost = function() { if (ghostSuffix) { input.value += ghostSuffix; ghostSuffix = ''; input.focus(); updatePrediction(); } };
-window.completeChip = (text) => { const val = input.value; const parts = val.split(' '); if (val.endsWith(' ')) input.value += text; else { parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + text; } if (!text.endsWith(':')) input.value += ' '; input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
-window.fill = (s) => { if (wizard) { input.value = s; } else { input.value += s + ' '; } input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
-
-// GLOBAL EXPORT
-window.Editor = {
-    el: document.getElementById('editor-modal'), area: document.getElementById('raw-editor'),
-    open() { this.area.value = LedgerManager.getRaw(); this.el.classList.add('open'); setTimeout(()=>this.area.focus(), 300); },
-    save() { LedgerManager.save(this.area.value); LedgerManager.load(); this.close(); log("Saved.", 'success'); },
-    close() { this.el.classList.remove('open'); },
-    copy() { navigator.clipboard.writeText(this.area.value).then(()=> { const btn = document.getElementById('copy-btn'); const original = btn.innerText; btn.innerText = "Copied!"; setTimeout(()=>btn.innerText=original, 1500); }); }
+window.applyMath = function(res) {
+    const val = input.value.trim();
+    if (MathEngine.eval(val) === res) { input.value = res + ' '; } 
+    else { const parts = val.split(' '); const last = parts.pop(); if (MathEngine.eval(last) === res) { input.value = parts.join(' ') + ' ' + res + ' '; } else { input.value += res + ' '; } }
+    input.focus(); updatePrediction();
 };
 
+window.acceptGhost = function() { if (ghostSuffix) { input.value += ghostSuffix; ghostSuffix = ''; input.focus(); updatePrediction(); } };
+window.completeChip = (text) => { if (ConfirmationMode.active || (wizard && wizard.state === 3)) { input.value = text; run(text); return; } const val = input.value; const parts = val.split(' '); if (val.endsWith(' ')) input.value += text; else { parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + text; } if (!text.endsWith(':') && !text.startsWith('type:')) input.value += ' '; input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
+window.fill = (s) => { if (wizard) { input.value = s; } else { input.value += s + ' '; } input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
+fileInput.onchange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { const txt = e.target.result; if (pendingLedgerAction === 'merge') { LedgerManager.merge(txt); } else { LedgerManager.save(LedgerManager.getRaw() + '\n' + txt); LedgerManager.loadRaw(LedgerManager.getRaw()); log(`Imported ${file.name} (Appended).`, 'success'); } pendingLedgerAction = null; }; reader.readAsText(file); };
 input.addEventListener('input', updatePrediction);
 input.addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key === 'ArrowRight') { e.preventDefault(); acceptGhost(); } if (e.key === 'Enter') { run(input.value); input.value = ''; updatePrediction(); } });
-if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}); container.scrollTop = container.scrollHeight; }); }
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; setTimeout(() => inputWrapper.scrollIntoView({behavior: "auto", block: "end"}), 50); container.scrollTop = container.scrollHeight; }); }
+
+// INIT
+LedgerManager.load(); run('dash'); updatePrediction();
+if (window.showOpenFilePicker && !Persistence.fileHandle) { log('<div class="line warn" style="cursor:pointer" onclick="run(\'mount\')">⚠️ STORAGE IS LOCAL. CLICK TO MOUNT FILE.</div>'); }
 </script>
 </body>
 </html>
