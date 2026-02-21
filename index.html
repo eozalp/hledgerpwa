@@ -1,7 +1,7 @@
 <!-- 
 ================================================================================
 APPLICATION IDENTITY:
-  - Name: Ledgie v1.0 — Smart Personal Ledger
+  - Name: Ledgie v11 — Smart Personal Ledger
   - Type: Single-File HTML5 PWA
   - Architecture: Titanium Graph Engine V3.5
 
@@ -93,10 +93,10 @@ CHANGELOG V24.01:
         .dismiss-btn { cursor: pointer; text-decoration: underline; font-weight: bold; font-size: 0.9em; opacity: 0.8; margin-left: 10px; white-space: nowrap; }
         .dismiss-btn:hover { opacity: 1; }
 
-        .help-cat { color: var(--primary); font-weight: bold; margin-top: 12px; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--panel); padding-bottom: 2px; }
-        .help-cmd { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
-        .help-cmd span:first-child { color: var(--text); font-weight: 500; }
-        .help-cmd span:last-child { color: var(--accent); opacity: 0.8; font-size: 12px; }
+        .help-cat { color: var(--text); font-weight: bold; margin-top: 16px; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.5px; background: rgba(56,189,248,0.08); border-left: 2px solid var(--primary); padding: 4px 8px; border-radius: 0 4px 4px 0; }
+        .help-cmd { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .help-cmd span:first-child { color: var(--primary); font-weight: 500; font-family: var(--font); flex-shrink: 0; min-width: 120px; max-width: 55%; }
+        .help-cmd span:last-child { color: var(--accent); font-size: 11px; text-align: right; }
 
         /* GRAPH & TOOLTIP STYLES */
         .graph-container { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 12px; margin: 12px 0; position: relative; user-select: none; overflow: hidden; }
@@ -264,13 +264,19 @@ CHANGELOG V24.01:
         /* KEYBOARD SHORTCUTS OVERLAY */
         #keys-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(4px); }
         #keys-modal.open { opacity: 1; pointer-events: auto; }
-        #keys-panel { background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 20px; max-width: 480px; width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+        #keys-panel { background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 0; max-width: 580px; width: 95vw; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.7); overflow: hidden; }
+        #keys-panel-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--accent); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+        #keys-panel-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        #keys-panel-footer { padding: 10px 20px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; text-align: center; }
+        #keys-panel h2 { margin: 0; font-size: 13px; color: var(--primary); letter-spacing: 2px; text-transform: uppercase; }
+        .keys-close-x { background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+        .keys-close-x:hover { background: var(--error); border-color: var(--error); color: white; }
         #keys-panel h2 { margin: 0 0 16px; font-size: 13px; color: var(--primary); letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid var(--accent); padding-bottom: 8px; }
         .keys-section { margin-bottom: 14px; }
-        .keys-section-title { font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-        .key-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; }
-        .key-row span:first-child { color: var(--text); }
-        .key-row span:last-child { color: var(--accent); }
+        .keys-section-title { font-size: 11px; color: var(--primary); font-weight: bold; letter-spacing: 0.5px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px; }
+        .key-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 12px; gap: 12px; }
+        .key-row span:first-child { color: var(--text); flex-shrink: 0; }
+        .key-row span:last-child { color: var(--ghost); font-size: 11px; text-align: right; min-width: 0; }
         kbd { background: var(--bg); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; font-family: var(--font); font-size: 11px; color: var(--primary); }
 
         /* SEARCH HIGHLIGHT */
@@ -479,8 +485,13 @@ CHANGELOG V24.01:
 
 <div id="terminal-container" ondblclick="input.blur()">
     <div id="terminal-content">
-        <div class="line system">Ledgie v11 — smart personal ledger. Graph Engine online. Type <span style="color:var(--primary);cursor:pointer" onclick="run('help')">help</span> · <span style="color:var(--primary);cursor:pointer" onclick="toggleKeys()">?</span> for shortcuts · <span style="color:var(--primary);cursor:pointer" onclick="run('tutorial')">tutorial</span> to learn</div>
-        <div class="line system">Quick: <span style="color:var(--primary);cursor:pointer" onclick="run('recent')">recent</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('dash')">dash</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('add')">add</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('backup')">backup</span> · press <kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">d</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">r</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">b</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">n</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">p</kbd> for quick views</div>
+        <div class="line" style="padding:16px 0 4px;border-bottom:1px solid var(--panel);margin-bottom:12px">
+            <div style="font-size:15px;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:6px">LEDGIE v11 <span style="color:var(--ghost);font-size:11px;font-weight:normal">— plain-text personal ledger</span></div>
+            <div style="font-size:12px;color:var(--accent);line-height:1.8">
+                <span onclick="run('dash')" style="cursor:pointer;color:var(--text)">dash</span>  ·  <span onclick="run('add')" style="cursor:pointer;color:var(--text)">add</span>  ·  <span onclick="run('bal')" style="cursor:pointer;color:var(--text)">bal</span>  ·  <span onclick="run('reg')" style="cursor:pointer;color:var(--text)">reg</span>  ·  <span onclick="run('pnl')" style="cursor:pointer;color:var(--text)">pnl</span>  ·  <span onclick="run('graph')" style="cursor:pointer;color:var(--text)">graph</span>  ·  <span onclick="run('help')" style="cursor:pointer;color:var(--primary)">help</span>  ·  <span onclick="toggleKeys()" style="cursor:pointer;color:var(--primary)">? shortcuts</span>
+            </div>
+            <div style="font-size:11px;color:var(--ghost);margin-top:6px">Hotkeys: <kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">d</kbd> dash &nbsp;<kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">r</kbd> recent &nbsp;<kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">b</kbd> bal &nbsp;<kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">n</kbd> new &nbsp;<kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">p</kbd> p&amp;l &nbsp;<kbd style="background:var(--panel);border:1px solid var(--ghost);border-radius:3px;padding:1px 5px;color:var(--accent)">w</kbd> waterfall</div>
+        </div>
     </div>
 </div>
 
@@ -504,60 +515,130 @@ CHANGELOG V24.01:
 <!-- KEYBOARD SHORTCUTS OVERLAY -->
 <div id="keys-modal" onclick="if(event.target===this)toggleKeys()">
     <div id="keys-panel">
-        <h2>⌨ Quick Reference</h2>
+        <div id="keys-panel-header">
+            <h2>⌨ Quick Reference</h2>
+            <button class="keys-close-x" onclick="toggleKeys()" title="Close (Esc)">✕</button>
+        </div>
+        <div id="keys-panel-body">
+
         <div class="keys-section">
-            <div class="keys-section-title">Terminal</div>
-            <div class="key-row"><span>Cycle history up/down</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+            <div class="keys-section-title">⚡ Hotkeys (when input is empty)</div>
+            <div class="key-row"><span>Dashboard</span><span><kbd>d</kbd></span></div>
+            <div class="key-row"><span>Recent transactions</span><span><kbd>r</kbd></span></div>
+            <div class="key-row"><span>Balances</span><span><kbd>b</kbd></span></div>
+            <div class="key-row"><span>New transaction</span><span><kbd>n</kbd></span></div>
+            <div class="key-row"><span>P&amp;L statement</span><span><kbd>p</kbd></span></div>
+            <div class="key-row"><span>Waterfall chart</span><span><kbd>w</kbd></span></div>
+            <div class="key-row"><span>Command history up/down</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
             <div class="key-row"><span>Accept autocomplete</span><span><kbd>Tab</kbd> or <kbd>→</kbd></span></div>
             <div class="key-row"><span>Clear screen</span><span><kbd>Ctrl</kbd>+<kbd>L</kbd></span></div>
-            <div class="key-row"><span>This help</span><span><kbd>?</kbd></span></div>
-            <div class="key-row"><span>Dashboard (empty input)</span><span><kbd>d</kbd></span></div>
-            <div class="key-row"><span>Recent (empty input)</span><span><kbd>r</kbd></span></div>
-            <div class="key-row"><span>Balances (empty input)</span><span><kbd>b</kbd></span></div>
-            <div class="key-row"><span>New transaction (empty input)</span><span><kbd>n</kbd></span></div>
-            <div class="key-row"><span>P&amp;L statement (empty input)</span><span><kbd>p</kbd></span></div>
-            <div class="key-row"><span>Waterfall (empty input)</span><span><kbd>w</kbd></span></div>
+            <div class="key-row"><span>This panel</span><span><kbd>?</kbd></span></div>
+            <div class="key-row"><span>Close modal</span><span><kbd>Esc</kbd></span></div>
         </div>
+
         <div class="keys-section">
-            <div class="keys-section-title">Commands</div>
-            <div class="key-row"><span>Dashboard</span><span><code>dash</code></span></div>
-            <div class="key-row"><span>Net worth</span><span><code>net</code></span></div>
-            <div class="key-row"><span>Recent transactions</span><span><code>recent [N]</code></span></div>
-            <div class="key-row"><span>Balance sheet</span><span><code>bal [filter]</code></span></div>
-            <div class="key-row"><span>Register</span><span><code>reg [filter]</code></span></div>
-            <div class="key-row"><span>P&amp;L statement</span><span><code>pnl [filter]</code></span></div>
-            <div class="key-row"><span>Profit waterfall</span><span><code>waterfall [filter]</code></span></div>
-            <div class="key-row"><span>Accounts + balances</span><span><code>accounts</code></span></div>
-            <div class="key-row"><span>Tag list</span><span><code>tags</code></span></div>
-            <div class="key-row"><span>Search transactions</span><span><code>search &lt;text&gt;</code></span></div>
-            <div class="key-row"><span>Trend analysis</span><span><code>trend [account]</code></span></div>
-            <div class="key-row"><span>Spending forecast</span><span><code>forecast [days]</code></span></div>
-            <div class="key-row"><span>Chart of accounts (editor)</span><span><code>coa</code></span></div>
-            <div class="key-row"><span>Graph (line/area/bar/donut)</span><span><code>graph [type:X] [by:Y]</code></span></div>
-            <div class="key-row"><span>Integrity check</span><span><code>check</code></span></div>
+            <div class="keys-section-title">📊 Views</div>
+            <div class="key-row"><span>Dashboard — net worth + monthly</span><span><code>dash</code></span></div>
+            <div class="key-row"><span>Net worth (assets − liabilities)</span><span><code>net</code></span></div>
+            <div class="key-row"><span>Recent N transactions</span><span><code>recent [N]</code></span></div>
+            <div class="key-row"><span>Register with running balance</span><span><code>reg [filter]</code></span></div>
+            <div class="key-row"><span>Hierarchical balances</span><span><code>bal [filter]</code></span></div>
+            <div class="key-row"><span>Income statement</span><span><code>pnl [filter]</code></span></div>
+            <div class="key-row"><span>Waterfall chart</span><span><code>waterfall [filter]</code></span></div>
+            <div class="key-row"><span>All accounts with balances</span><span><code>accounts [filter]</code></span></div>
+            <div class="key-row"><span>Tag list and usage counts</span><span><code>tags</code></span></div>
+            <div class="key-row"><span>6-month trend</span><span><code>trend [account]</code></span></div>
+            <div class="key-row"><span>Recurring payment forecast</span><span><code>forecast [days]</code></span></div>
+            <div class="key-row"><span>Ledger statistics</span><span><code>stats</code></span></div>
+            <div class="key-row"><span>Integrity check + assertions</span><span><code>check</code></span></div>
         </div>
+
         <div class="keys-section">
-            <div class="keys-section-title">Entry</div>
-            <div class="key-row"><span>Smart editor</span><span><code>add</code></span></div>
-            <div class="key-row"><span>Buy stock/commodity</span><span><code>buy 80 AAPL with 9000 TRY</code></span></div>
-            <div class="key-row"><span>Register commodity</span><span><code>commodity TRY</code></span></div>
-            <div class="key-row"><span>Repeat last match</span><span><code>recur &lt;desc&gt;</code></span></div>
-            <div class="key-row"><span>Undo last entry</span><span><code>undo</code></span></div>
-            <div class="key-row"><span>Delete by index</span><span><code>rm &lt;id&gt;</code></span></div>
+            <div class="keys-section-title">📉 Charts</div>
+            <div class="key-row"><span>Line/area/bar/scatter/donut</span><span><code>graph [accs] [opts]</code></span></div>
+            <div class="key-row"><span>Monthly expense bars</span><span><code>graph expenses type:bar by:month</code></span></div>
+            <div class="key-row"><span>Income vs expense donut</span><span><code>graph income expenses type:donut</code></span></div>
+            <div class="key-row"><span>Cumulative net worth</span><span><code>graph assets cum</code></span></div>
+            <div class="key-row"><span>Chart of accounts editor</span><span><code>coa [filter]</code></span></div>
         </div>
+
         <div class="keys-section">
-            <div class="keys-section-title">Data</div>
+            <div class="keys-section-title">🔍 Search &amp; Filters</div>
+            <div class="key-row"><span>Full-text search</span><span><code>search &lt;text&gt;</code></span></div>
+            <div class="key-row"><span>Date filter</span><span><code>date:thismonth</code></span></div>
+            <div class="key-row"><span>Date keywords</span><span><code>today yesterday thisweek lastweek thismonth lastmonth thisyear lastyear q1–q4</code></span></div>
+            <div class="key-row"><span>Date range</span><span><code>date:2024-01..2024-06</code></span></div>
+            <div class="key-row"><span>Amount filter</span><span><code>amt:&gt;100</code> &nbsp; <code>amt:&lt;=500</code></span></div>
+            <div class="key-row"><span>Tag filter</span><span><code>tag:food</code></span></div>
+            <div class="key-row"><span>Description filter</span><span><code>desc:grocery</code></span></div>
+            <div class="key-row"><span>Account filter</span><span><code>acc:expenses:food</code></span></div>
+            <div class="key-row"><span>Exclude accounts</span><span><code>-liabilities</code></span></div>
+            <div class="key-row"><span>Cleared transactions</span><span><code>flag:*</code></span></div>
+            <div class="key-row"><span>Pending transactions</span><span><code>flag:!</code></span></div>
+        </div>
+
+        <div class="keys-section">
+            <div class="keys-section-title">✏️ Entry</div>
+            <div class="key-row"><span>Smart editor (append-only)</span><span><code>add</code></span></div>
+            <div class="key-row"><span>Repeat past transaction</span><span><code>recur &lt;desc&gt;</code></span></div>
+            <div class="key-row"><span>Buy stock / commodity</span><span><code>buy &lt;qty&gt; &lt;COMM&gt; [with|at] &lt;amt&gt; &lt;CCY&gt;</code></span></div>
+            <div class="key-row"><span>Register commodity symbol</span><span><code>commodity &lt;SYM&gt;</code></span></div>
+            <div class="key-row"><span>Add balance assertion</span><span><code>assert &lt;account&gt; &lt;amount&gt;</code></span></div>
+            <div class="key-row"><span>Undo last entry (auto-backup)</span><span><code>undo</code></span></div>
+            <div class="key-row"><span>Delete transaction by ID</span><span><code>rm &lt;id&gt;</code></span></div>
+        </div>
+
+        <div class="keys-section">
+            <div class="keys-section-title">🗂️ Accounts &amp; Aliases</div>
+            <div class="key-row"><span>Add account</span><span><code>account add &lt;name&gt;</code></span></div>
+            <div class="key-row"><span>Add alias</span><span><code>alias add &lt;key&gt; &lt;account&gt;</code></span></div>
+            <div class="key-row"><span>List aliases</span><span><code>alias list</code></span></div>
+            <div class="key-row"><span>Remove alias</span><span><code>alias rm &lt;key&gt;</code></span></div>
+        </div>
+
+        <div class="keys-section">
+            <div class="keys-section-title">💾 Data &amp; Backup</div>
             <div class="key-row"><span>Mount file (picker)</span><span><code>mount</code></span></div>
-            <div class="key-row"><span>Re-link saved file</span><span><code>remount</code></span></div>
-            <div class="key-row"><span>Disconnect file</span><span><code>unmount</code></span></div>
-            <div class="key-row"><span>Export file</span><span><code>export</code></span></div>
-            <div class="key-row"><span>Export CSV</span><span><code>export csv</code></span></div>
-            <div class="key-row"><span>Export JSON</span><span><code>export json</code></span></div>
-            <div class="key-row"><span>Copy to clipboard</span><span><code>export copy</code></span></div>
-            <div class="key-row"><span>Manual backup</span><span><code>backup now</code></span></div>
-            <div class="key-row"><span>View backups</span><span><code>backup list</code></span></div>
+            <div class="key-row"><span>Re-link previously mounted file</span><span><code>remount</code></span></div>
+            <div class="key-row"><span>Disconnect file link</span><span><code>unmount</code></span></div>
+            <div class="key-row"><span>Download .hledger file</span><span><code>export</code></span></div>
+            <div class="key-row"><span>Download as CSV</span><span><code>export csv</code></span></div>
+            <div class="key-row"><span>Download as JSON</span><span><code>export json</code></span></div>
+            <div class="key-row"><span>Copy raw ledger to clipboard</span><span><code>export copy</code></span></div>
+            <div class="key-row"><span>Manual backup to localStorage</span><span><code>backup now</code></span></div>
+            <div class="key-row"><span>View &amp; restore backups</span><span><code>backup list</code></span></div>
+            <div class="key-row"><span>Import a .hledger file</span><span><code>ledger import</code></span></div>
+            <div class="key-row"><span>Merge another file</span><span><code>ledger merge</code></span></div>
+            <div class="key-row"><span>List ledgers</span><span><code>ledger list</code></span></div>
+            <div class="key-row"><span>Switch ledger</span><span><code>ledger switch &lt;name&gt;</code></span></div>
+            <div class="key-row"><span>Reset ledger (dangerous)</span><span><code>ledger reset</code></span></div>
+            <div class="key-row"><span>Command history</span><span><code>history [N]</code></span></div>
         </div>
-        <div style="text-align:center;margin-top:12px"><button class="btn btn-secondary" onclick="toggleKeys()">Close</button></div>
+
+        <div class="keys-section">
+            <div class="keys-section-title">⚙️ Config &amp; Themes</div>
+            <div class="key-row"><span>List all settings</span><span><code>config list</code></span></div>
+            <div class="key-row"><span>Toggle strict validation</span><span><code>config strict</code></span></div>
+            <div class="key-row"><span>Set theme</span><span><code>config theme &lt;name&gt;</code></span></div>
+            <div class="key-row"><span>Available themes</span><span><code>matrix dracula paper solarized catppuccin nord monokai</code></span></div>
+            <div class="key-row"><span>Reset theme</span><span><code>config theme reset</code></span></div>
+            <div class="key-row"><span>Custom font size</span><span><code>config theme font 14px</code></span></div>
+            <div class="key-row"><span>Set budget</span><span><code>config budget set &lt;category&gt; &lt;amount&gt;</code></span></div>
+            <div class="key-row"><span>View budget progress</span><span><code>config budget list</code></span></div>
+            <div class="key-row"><span>Remove budget</span><span><code>config budget rm &lt;category&gt;</code></span></div>
+            <div class="key-row"><span>Change confirmation word</span><span><code>config set safety_word &lt;word&gt;</code></span></div>
+            <div class="key-row"><span>Change backup reminder interval</span><span><code>config set backup_reminder &lt;N&gt;</code></span></div>
+        </div>
+
+        <div class="keys-section">
+            <div class="keys-section-title">🌐 PWA &amp; Install</div>
+            <div class="key-row"><span>Install as native app</span><span><code>install</code></span></div>
+            <div class="key-row"><span>PWA / service worker status</span><span><code>pwa status</code></span></div>
+            <div class="key-row"><span>Check for app update</span><span><code>pwa update</code></span></div>
+        </div>
+
+        </div>
+        <div id="keys-panel-footer"><button class="btn btn-secondary" onclick="toggleKeys()" style="width:120px">Close</button></div>
     </div>
 </div>
 
@@ -626,9 +707,6 @@ const fmtAmt = (val, comm, pos) => {
     return pos === 'left' ? `${comm}${fmtNum(val)}` : `${fmtNum(val)} ${comm}`;
 };
 
-// Pad string to fixed width (right-align numbers, left-align labels)
-const padLeft = (s, w) => String(s).padStart(w);
-const padRight = (s, w) => String(s).padEnd(w);
 
 const escapeHtml = (unsafe) => String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
@@ -2583,9 +2661,18 @@ const ENGINE = {
         const accs = this.accounts.map(a => ({ text: a, display: a, type: 'acc', icon: '👤' }));
         return [...aliases, ...accs];
     },
-    getDateCandidates() { 
+    getDateCandidates() {
         const now = new Date();
         const y = now.getFullYear();
+        const m = now.getMonth(); // 0-indexed
+        // Build all 12 months starting from current month backwards
+        const months = [];
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(y, m - i, 1);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yr = d.getFullYear();
+            months.push({ text: `${yr}-${mm}`, type: 'date', icon: '📅' });
+        }
         return [
             {text:'today',type:'date',icon:'📅'},
             {text:'yesterday',type:'date',icon:'📅'},
@@ -2599,8 +2686,7 @@ const ENGINE = {
             {text:'q2',type:'date',icon:'📅'},
             {text:'q3',type:'date',icon:'📅'},
             {text:'q4',type:'date',icon:'📅'},
-            {text:`${y}-01`,type:'date',icon:'📅'},
-            {text:`${y}-02`,type:'date',icon:'📅'},
+            ...months,
         ];
     },
     getGraphCandidates() { return [
@@ -3453,7 +3539,7 @@ async function run(raw) {
                     log(`<div class="budget-row"><div class="budget-label"><span>${escapeHtml(cat)}</span><span>${fmtNum(spent)} / ${fmtNum(limit)}</span></div><div class="budget-track"><div class="${cls}" style="width:${pct}%"></div></div></div>`);
                 });
             } 
-            else if (args[1] === 'rm') { ConfirmationMode.start('Remove Budget', () => { BudgetManager.remove(args[2]); log(`Removed.`, 'success'); }); return; } 
+            else if (args[1] === 'rm') { if (!args[2]) { log('Usage: config budget rm <category>', 'error'); return; } BudgetManager.remove(args[2]); log(`✓ Budget "${escapeHtml(args[2])}" removed.`, 'success'); return; } 
             else if (args[1] === 'set') { BudgetManager.set(args[2], args[3]); log(`Set.`, 'success'); }
             return;
         }
@@ -4182,10 +4268,8 @@ async function run(raw) {
         if (transactions.length === 0) { log("Nothing to undo.", 'warn'); return; } 
         // Backup before undo
         Persistence.autoBackup(LedgerManager.getRaw());
-        // Remove the last transaction by date order (most recently entered or latest date)
-        const lastIdx = transactions.reduce((best, t, i) => 
-            t.date > transactions[best].date ? i : best, 0);
-        const removed = transactions.splice(lastIdx, 1)[0];
+        // Remove the last transaction as-appended (last in array = most recently added)
+        const removed = transactions.splice(transactions.length - 1, 1)[0];
         // Re-number IDs
         transactions.forEach((t, i) => t.id = i);
         const safeRaw = reconstructFile(); 
@@ -4421,92 +4505,115 @@ async function run(raw) {
         });
         log(html);
     }
-    else if (verb === 'help') { 
-        const h = (cat, cmds) => `<div class="help-cat">${cat}</div>` + cmds.map(c => `<div class="help-cmd"><span>${c[0]}</span><span>${c[1]}</span></div>`).join(''); 
-        let html = h('LEARN', [
-            ['tutorial', 'Interactive guide'],
-            ['tutorial tips', 'Power user tips'],            ['tutorial backup', 'Backup & sync guide'],
-            ['?', 'Keyboard shortcuts']
-        ]); 
-        html += h('VIEWS', [
-            ['dash', 'Dashboard: net worth + monthly'],
-            ['net', 'Net worth summary (assets - liabilities)'],
-            ['recent [N]', 'Last N transactions'],
+    else if (verb === 'help') {
+        const h = (cat, cmds) => `<div class="help-cat">${cat}</div>` + cmds.map(c => `<div class="help-cmd"><span>${c[0]}</span><span>${c[1]}</span></div>`).join('');
+        let html = h('⚡ HOTKEYS (empty input)', [
+            ['d', 'Dashboard'],
+            ['r', 'Recent transactions'],
+            ['b', 'Balances'],
+            ['n', 'New transaction (add)'],
+            ['p', 'P&amp;L statement'],
+            ['w', 'Waterfall chart'],
+            ['↑ ↓', 'Command history'],
+            ['Tab / →', 'Autocomplete'],
+            ['Ctrl+L', 'Clear screen'],
+            ['?', 'Quick reference panel'],
+            ['Esc', 'Close modal'],
+        ]);
+        html += h('📊 VIEWS', [
+            ['dash', 'Dashboard — net worth + monthly summary'],
+            ['net', 'Net worth (assets − liabilities)'],
+            ['recent [N]', 'Last N transactions (default 10)'],
             ['reg [filter]', 'Register with running balance'],
             ['bal [filter]', 'Hierarchical balances by account'],
-            ['pnl [filter]', 'Income statement with breakdown'],
-            ['waterfall [filter]', 'Income→Expenses→Net profit waterfall chart'],
+            ['pnl [filter]', 'Income statement with % breakdown'],
+            ['waterfall [filter]', 'Income → Expenses → Net profit waterfall'],
             ['accounts [filter]', 'All accounts with balances'],
             ['tags', 'All tags and usage counts'],
-            ['trend [account]', 'Month-over-month trend'],
-            ['forecast [days]', 'Recurring payment forecast'],
-            ['coa [filter]', 'Chart of accounts — opens batch editor'],
-            ['graph [accs] [opts]', 'Charts: line/area/bar/scatter/donut'],
-            ['graph expenses type:bar by:month', 'Example: monthly expense bars'],
-            ['graph income expenses type:donut', 'Example: income vs expense donut'],
-            ['graph assets cum', 'Example: cumulative net worth line']
-        ]); 
-        html += h('SEARCH & FILTERS', [
-            ['search <text>', 'Full-text search'],
-            ['reg date:thismonth', 'This month (also: thisweek, q1-q4, lastmonth)'],
-            ['bal assets date:thisyear', 'Date-filtered balance'],
-            ['reg date:2024-01..2024-06', 'Date range filter'],
-            ['bal -liabilities', 'Exclude accounts'],
-            ['reg amt:>100', 'Amount filter (>, <, >=, <=, =)'],
-            ['reg tag:food', 'Tag filter'],
-            ['reg desc:grocery', 'Description filter'],
-            ['reg acc:expenses:food', 'Account filter'],
-            ['reg flag:*', 'Cleared transactions only']
-        ]); 
-        html += h('ENTRY', [
-            ['add', 'Smart Editor (preferred)'],
-            ['buy &lt;qty&gt; &lt;COMM&gt; [with|at] &lt;amt&gt; &lt;CCY&gt;', 'Quick stock/commodity purchase'],
-            ['buy 80 AAPL with 9000 TRY', 'Example: 80 AAPL using total TRY cost'],
-            ['commodity &lt;SYM&gt;', 'Register commodity (e.g. TRY, AAPL, BTC)'],
-            ['recur &lt;desc&gt;', 'Repeat a past transaction'],
+            ['trend [account]', '6-month month-over-month trend'],
+            ['forecast [days]', 'Recurring payment forecast (default 30)'],
+            ['stats', 'Ledger statistics'],
+            ['check', 'Validate all transactions + balance assertions'],
+            ['history [N]', 'Command history (clickable)'],
+        ]);
+        html += h('📉 CHARTS', [
+            ['graph [accs] [opts]', 'Charts: line / area / bar / scatter / donut'],
+            ['coa [filter]', 'Chart of accounts — opens visual editor'],
+            ['graph expenses type:bar by:month', '→ Monthly expense bars'],
+            ['graph income expenses type:donut', '→ Income vs expense donut'],
+            ['graph assets cum', '→ Cumulative net worth line'],
+            ['graph expenses type:area by:week', '→ Weekly area chart'],
+        ]);
+        html += h('🔍 SEARCH &amp; FILTERS', [
+            ['search &lt;text&gt;', 'Full-text search across descriptions &amp; accounts'],
+            ['date:thismonth', 'Date filter — also: today yesterday thisweek lastweek lastmonth thisyear lastyear q1–q4'],
+            ['date:2024-01..2024-06', 'Explicit date range'],
+            ['amt:&gt;100 / amt:&lt;=500', 'Amount filter (also &gt;= = &lt;)'],
+            ['tag:food', 'Tag filter (also key:value or #hashtag)'],
+            ['desc:grocery', 'Description contains'],
+            ['acc:expenses:food', 'Account path contains'],
+            ['-liabilities', 'Negate any term or filter'],
+            ['flag:*', 'Cleared (flag:! = pending)'],
+        ]);
+        html += h('✏️ ENTRY', [
+            ['add', 'Smart append-only editor (preferred)'],
+            ['recur &lt;desc&gt;', 'Clone a past transaction by description'],
+            ['buy &lt;qty&gt; &lt;COMM&gt; [with|at] &lt;amt&gt; &lt;CCY&gt;', 'Quick commodity/stock purchase'],
+            ['buy 80 AAPL with 9000 TRY', '→ 80 shares at total TRY cost'],
+            ['commodity &lt;SYM&gt;', 'Register commodity (e.g. TRY AAPL BTC)'],
+            ['assert &lt;account&gt; &lt;amount&gt;', 'Add balance assertion to ledger'],
             ['undo', 'Revert last entry (auto-backup first)'],
-            ['rm &lt;id&gt;', 'Delete by ID (with confirmation)'],
-            ['assert &lt;acc&gt; &lt;amt&gt;', 'Add balance assertion'],
-            ['account add &lt;n&gt;', 'Add account to chart']
-        ]); 
-        html += h('DATA & BACKUP', [
-            ['install', 'Install Ledgie as a native app (offline-capable)'],
-            ['pwa status', 'Show PWA / Service Worker status'],
-            ['pwa update', 'Check for app update'],
+            ['rm &lt;id&gt;', 'Delete transaction by ID (requires confirmation)'],
+        ]);
+        html += h('🗂️ ACCOUNTS &amp; ALIASES', [
+            ['account add &lt;name&gt;', 'Add account to chart of accounts'],
+            ['coa', 'Visual editor (rename, add, delete accounts)'],
+            ['alias add &lt;key&gt; &lt;account&gt;', 'Create account alias'],
+            ['alias list', 'List all aliases'],
+            ['alias rm &lt;key&gt;', 'Remove alias'],
+        ]);
+        html += h('💾 DATA &amp; BACKUP', [
+            ['mount', 'Pick a .hledger file — mount for live sync'],
             ['remount', 'Re-link previously mounted file silently'],
-            ['unmount', 'Disconnect file & forget the link'],
-            ['export', 'Download .hledger file (timestamped)'],
+            ['unmount', 'Disconnect file link &amp; forget it'],
+            ['export', 'Download .hledger snapshot (timestamped)'],
             ['export csv', 'Download as CSV'],
             ['export json', 'Download as JSON'],
-            ['export copy', 'Copy raw ledger to clipboard'],
-            ['backup now', 'Manual auto-backup'],
-            ['backup list', 'View and restore auto-backups'],
-            ['ledger list', 'List all ledgers'],
-            ['ledger switch <name>', 'Switch ledger'],
-            ['ledger merge', 'Import and merge another file'],
-            ['check', 'Validate all transactions + assertions'],
-            ['stats', 'Ledger statistics']
-        ]); 
-        html += h('CONFIG', [
-            ['config list', 'Show all settings'],
-            ['config strict', 'Toggle strict validation mode'],
-            ['config theme solarized', 'Set theme (matrix/dracula/paper/solarized/catppuccin/nord/monokai)'],
-            ['config theme reset', 'Reset to default theme'],
-            ['config budget set food 500', 'Set monthly budget for a category'],
-            ['config budget list', 'View budgets & progress'],
-            ['config budget rm food', 'Remove a budget'],
-            ['config set safety_word YES', 'Change confirmation word'],
-            ['config set backup_reminder 5', 'Change backup reminder interval'],
+            ['export copy', 'Copy raw ledger text to clipboard'],
+            ['backup now', 'Save manual backup to localStorage'],
+            ['backup list', 'View &amp; restore auto-backups'],
+            ['ledger import', 'Import a .hledger file (replaces current)'],
+            ['ledger merge', 'Merge another .hledger file into current'],
+            ['ledger list', 'List all ledgers in this browser'],
+            ['ledger switch &lt;name&gt;', 'Switch to another ledger'],
+            ['ledger reset', 'Wipe current ledger (requires confirmation)'],
         ]);
-        html += h('ALIASES', [
-            ['alias add <key> <account>', 'Add account alias'],
-            ['alias list', 'List all aliases'],
-            ['alias rm <key>', 'Remove alias'],
+        html += h('⚙️ CONFIG &amp; THEMES', [
+            ['config list', 'Show all config key/value pairs'],
+            ['config strict', 'Toggle strict account validation mode'],
+            ['config theme &lt;name&gt;', 'Theme: matrix dracula paper solarized catppuccin nord monokai'],
+            ['config theme reset', 'Reset all theme overrides to default'],
+            ['config theme font 14px', 'Set custom font size'],
+            ['config budget set &lt;cat&gt; &lt;amt&gt;', 'Set monthly spending budget'],
+            ['config budget list', 'View budgets with progress bars'],
+            ['config budget rm &lt;cat&gt;', 'Remove a budget'],
+            ['config set safety_word &lt;word&gt;', 'Change confirmation word for destructive actions'],
+            ['config set backup_reminder &lt;N&gt;', 'Trigger backup nudge every N transactions'],
         ]);
-        html += h('KEYS', [['↑ ↓', 'Command history'],['Tab / →', 'Autocomplete'],['Ctrl+L', 'Clear screen'],['d / r / b', 'dash/recent/bal (empty input)'],['n', 'New transaction (add)'],['p', 'P&L statement'],['?', 'Quick reference']]); 
-        log(html); 
+        html += h('🌐 PWA &amp; INSTALL', [
+            ['install', 'Install Ledgie as offline-capable native app'],
+            ['pwa status', 'Show PWA &amp; service worker status'],
+            ['pwa update', 'Check for app update'],
+        ]);
+        html += h('📖 LEARN', [
+            ['tutorial', 'Interactive basics guide'],
+            ['tutorial tips', 'Power user tips'],
+            ['tutorial backup', 'Backup &amp; sync guide'],
+            ['?', 'Quick reference panel (keyboard shortcut overlay)'],
+        ]);
+        log(html);
     }
-    else { log(`Unknown command: <b>${escapeHtml(verb)}</b>. Type <span style="cursor:pointer;color:var(--primary)" onclick="run('help')">help</span> or press <span style="cursor:pointer;color:var(--primary)" onclick="toggleKeys()">?</span> for reference.`, 'error'); }
+        else { log(`Unknown command: <b>${escapeHtml(verb)}</b>. Type <span style="cursor:pointer;color:var(--primary)" onclick="run('help')">help</span> or press <span style="cursor:pointer;color:var(--primary)" onclick="toggleKeys()">?</span> for reference.`, 'error'); }
 }
 
 function logRow(label, val, comm, pos) { 
@@ -4912,19 +5019,50 @@ function updatePrediction() {
     } else { 
         result = ENGINE.predict(val); 
         ghostSuffix = result.suggest; 
-        if (ghostSuffix) { tabBtn.classList.add('visible'); ghost.innerHTML = `<span style="opacity:0">${val}</span>` + ghostSuffix; } 
-        else { tabBtn.classList.remove('visible'); ghost.innerHTML = ''; }
+        if (ghostSuffix) { tabBtn.classList.add('visible');
+            // Safe: use two text nodes instead of innerHTML to avoid XSS
+            ghost.textContent = '';
+            const hiddenSpan = document.createElement('span');
+            hiddenSpan.style.opacity = '0';
+            hiddenSpan.textContent = val;
+            const ghostSpan = document.createElement('span');
+            ghostSpan.textContent = ghostSuffix;
+            ghost.appendChild(hiddenSpan);
+            ghost.appendChild(ghostSpan);
+        } else { tabBtn.classList.remove('visible'); ghost.textContent = ''; }
     }
     
-    let html = '';
-    if (mathRes !== null) { html += `<div class="chip math" onmousedown="event.preventDefault()" onclick="applyMath('${mathRes}')">= ${mathRes}</div>`; }
+    // Build chips safely with DOM nodes — no XSS via opt.text or opt.display
+    suggs.innerHTML = '';
+    if (mathRes !== null) {
+        const mc = document.createElement('div');
+        mc.className = 'chip math';
+        mc.dataset.math = String(mathRes);
+        mc.onmousedown = e => e.preventDefault();
+        mc.onclick = () => applyMath(mc.dataset.math);
+        mc.textContent = '= ' + mathRes;
+        suggs.appendChild(mc);
+    }
     const filtered = activeFilter === 'all' ? result.options : result.options.filter(o => o.type === activeFilter);
-    filtered.slice(0, 15).forEach(opt => {
-        const priorityClass = opt.priority ? 'priority' : ''; const mathClass = opt.type === 'math' ? 'math' : ''; const icon = opt.icon ? `<i>${opt.icon}</i>` : '';
-        const displayLabel = escapeHtml(opt.display || opt.text);
-        html += `<div class="chip ${priorityClass} ${mathClass}" onmousedown="event.preventDefault()" onclick="completeChip('${opt.text}')">${icon}${displayLabel}</div>`; 
+    filtered.slice(0, 15).forEach((opt, idx) => {
+        const chip = document.createElement('div');
+        const isBest = idx === 0 && result.options.length > 0;
+        chip.className = ['chip',
+            opt.priority ? 'priority' : '',
+            opt.type === 'math' ? 'math' : '',
+            isBest ? 'best-match' : ''
+        ].filter(Boolean).join(' ');
+        chip.dataset.val = opt.text;
+        chip.onmousedown = e => e.preventDefault();
+        chip.onclick = () => completeChip(chip.dataset.val);
+        if (opt.icon) {
+            const i = document.createElement('i');
+            i.textContent = opt.icon;
+            chip.appendChild(i);
+        }
+        chip.appendChild(document.createTextNode(opt.display || opt.text));
+        suggs.appendChild(chip);
     });
-    suggs.innerHTML = html;
 }
 
 window.applyMath = function(res) {
