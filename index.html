@@ -30,7 +30,7 @@ CHANGELOG V24.01:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-    <title>Ledgie v11 — Smart Ledger</title>
+    <title>Ledgie v10 — Smart Ledger</title>
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -52,8 +52,6 @@ CHANGELOG V24.01:
         [data-theme="paper"] { --bg:#fff; --panel:#f3f4f6; --text:#111; --primary:#000; --accent:#9ca3af; --ghost:#d1d5db; }
         [data-theme="solarized"] { --bg:#002b36; --panel:#073642; --text:#839496; --primary:#268bd2; --accent:#586e75; --ghost:#3a5361; --success:#859900; --warn:#b58900; --error:#dc322f; }
         [data-theme="catppuccin"] { --bg:#1e1e2e; --panel:#313244; --text:#cdd6f4; --primary:#89b4fa; --accent:#6c7086; --ghost:#45475a; --success:#a6e3a1; --warn:#f9e2af; --error:#f38ba8; }
-        [data-theme="nord"] { --bg:#2e3440; --panel:#3b4252; --text:#eceff4; --primary:#88c0d0; --accent:#4c566a; --ghost:#434c5e; --success:#a3be8c; --warn:#ebcb8b; --error:#bf616a; }
-        [data-theme="monokai"] { --bg:#272822; --panel:#3e3d32; --text:#f8f8f2; --primary:#a6e22e; --accent:#75715e; --ghost:#49483e; --success:#a6e22e; --warn:#e6db74; --error:#f92672; }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html { height: 100%; overscroll-behavior: none; }
@@ -236,10 +234,6 @@ CHANGELOG V24.01:
         .dash-card { background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--accent); display: flex; flex-direction: column; }
         .dash-label { font-size: 11px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
         .dash-val { font-size: 18px; font-weight: bold; color: var(--text); }
-
-        /* TOAST */
-        #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--panel); color: var(--text); padding: 8px 16px; border-radius: 20px; font-size: 12px; border: 1px solid var(--accent); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 9000; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         
         .pnl-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--panel); }
         .pnl-head { font-weight: bold; color: var(--primary); margin-top: 12px; border-bottom: 1px solid var(--accent); padding-bottom: 4px; }
@@ -320,7 +314,6 @@ CHANGELOG V24.01:
 
         /* GRAPH STATS PANEL */
         .graph-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-        @media (max-width: 400px) { .graph-stats { grid-template-columns: repeat(2, 1fr); } }
         .graph-stat { background: var(--bg); border: 1px solid var(--ghost); border-radius: 5px; padding: 5px 8px; text-align: center; }
         .graph-stat-label { font-size: 9px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }
         .graph-stat-val { font-size: 13px; font-weight: bold; color: var(--text); margin-top: 2px; }
@@ -468,7 +461,7 @@ CHANGELOG V24.01:
 <body>
 
 <div id="status-bar">
-    <span>LEDGIE <span style="color:var(--ghost);font-size:10px">v11</span></span>
+    <span>LEDGIE <span style="color:var(--ghost);font-size:10px">v2</span></span>
     <div id="status-right">
         <span id="pwa-badge">OFFLINE READY</span>
         <span id="mount-badge" onclick="run('stats')" title="Click for stats">MOUNTED</span>
@@ -479,8 +472,8 @@ CHANGELOG V24.01:
 
 <div id="terminal-container" ondblclick="input.blur()">
     <div id="terminal-content">
-        <div class="line system">Ledgie v11 — smart personal ledger. Graph Engine online. Type <span style="color:var(--primary);cursor:pointer" onclick="run('help')">help</span> · <span style="color:var(--primary);cursor:pointer" onclick="toggleKeys()">?</span> for shortcuts · <span style="color:var(--primary);cursor:pointer" onclick="run('tutorial')">tutorial</span> to learn</div>
-        <div class="line system">Quick: <span style="color:var(--primary);cursor:pointer" onclick="run('recent')">recent</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('dash')">dash</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('add')">add</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('backup')">backup</span> · press <kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">d</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">r</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">b</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">n</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">p</kbd> for quick views</div>
+        <div class="line system">Ledgie v2 — smart personal ledger. Graph Engine online. Type <span style="color:var(--primary);cursor:pointer" onclick="run('help')">help</span> · <span style="color:var(--primary);cursor:pointer" onclick="toggleKeys()">?</span> for shortcuts · <span style="color:var(--primary);cursor:pointer" onclick="run('tutorial')">tutorial</span> to learn</div>
+        <div class="line system">Quick: <span style="color:var(--primary);cursor:pointer" onclick="run('recent')">recent</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('dash')">dash</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('add')">add</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('backup')">backup</span> · press <kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">d</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">r</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">b</kbd> for quick views</div>
     </div>
 </div>
 
@@ -498,7 +491,6 @@ CHANGELOG V24.01:
 </div>
 
 <div id="graph-tooltip"></div>
-<div id="toast"></div>
 <input type="file" id="file-input" style="display:none">
 
 <!-- KEYBOARD SHORTCUTS OVERLAY -->
@@ -514,9 +506,6 @@ CHANGELOG V24.01:
             <div class="key-row"><span>Dashboard (empty input)</span><span><kbd>d</kbd></span></div>
             <div class="key-row"><span>Recent (empty input)</span><span><kbd>r</kbd></span></div>
             <div class="key-row"><span>Balances (empty input)</span><span><kbd>b</kbd></span></div>
-            <div class="key-row"><span>New transaction (empty input)</span><span><kbd>n</kbd></span></div>
-            <div class="key-row"><span>P&amp;L statement (empty input)</span><span><kbd>p</kbd></span></div>
-            <div class="key-row"><span>Waterfall (empty input)</span><span><kbd>w</kbd></span></div>
         </div>
         <div class="keys-section">
             <div class="keys-section-title">Commands</div>
@@ -615,9 +604,7 @@ const fmtNum = (n) => {
     // Use Decimal-safe rounding to avoid floating point drift
     const factor = 100;
     const r = Math.round((n + Number.EPSILON) * factor) / factor;
-    // Fix -0.00 display
-    const s = r.toFixed(2);
-    return s === '-0.00' ? '0.00' : s;
+    return r.toFixed(2);
 };
 
 // Format number with optional commodity symbol
@@ -686,7 +673,7 @@ function accountEndIdx(line) {
 
 const MathEngine = {
     eval(str) {
-        if (!str || /^\d{4}-\d{1,2}/.test(str) || /^[\d.\s]+$/.test(str)) return null; 
+        if (!str || /^\d{4}-\d{1,2}/.test(str) || /^[\d\.\s]+$/.test(str)) return null; 
         if (!/[\+\-\*\/]/.test(str)) return null;
         // Only allow safe math characters (no function calls, no variables)
         if (!/^[\[\d\.\+\-\*\/\(\)\s%]+$/.test(str)) return null;
@@ -808,8 +795,7 @@ function match(t, q) {
         }
         if (term.startsWith('tag:')) { 
             const [k,v] = term.substring(4).split(':'); 
-            const res = (t.tags && t.tags[k] !== undefined && (!v || t.tags[k]===v || t.tags[k]===true)) ||
-                        t.posts.some(p => p.comment && parseTags(p.comment)[k] !== undefined && (!v || parseTags(p.comment)[k]===v || parseTags(p.comment)[k]===true));
+            const res = t.tags && t.tags[k] !== undefined && (!v || t.tags[k]===v || t.tags[k]===true); 
             return isNeg ? !res : res; 
         }
         // Flag filter: flag:* or flag:!
@@ -840,85 +826,63 @@ function isValidRoot(name) { return FIXED_ROOTS.includes(name.split(':')[0]); }
    capable without requiring any external sw.js file.
    ========================================= */
 const PwaManager = {
-    /* ── SVG icon ────────────────────────────────────────────────────── */
+    /* ── SVG icon embedded as data URI ─────────────────────────────── */
     _icon: `data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="%230f172a"/><rect x="24" y="56" width="144" height="4" rx="2" fill="%2338bdf8"/><rect x="24" y="72" width="96" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="84" width="112" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="96" width="80" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="108" width="100" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="120" width="88" height="3" rx="1.5" fill="%23475569"/><rect x="120" y="68" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="80" width="48" height="3" rx="1.5" fill="%23f87171"/><rect x="120" y="92" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="104" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="116" width="48" height="3" rx="1.5" fill="%23f87171"/><text x="96" y="42" text-anchor="middle" font-family="monospace" font-size="20" font-weight="bold" fill="%2338bdf8">LEDGIE</text><rect x="24" y="132" width="144" height="2" rx="1" fill="%2338bdf8" opacity="0.4"/><text x="96" y="158" text-anchor="middle" font-family="monospace" font-size="13" fill="%2364748b">ledger</text></svg>`,
+
+    /* ── Service Worker source — runs in its own global scope ───────── */
+    _swSource(cacheName, pageUrl) {
+        return `
+/* Ledgie inline Service Worker — cache-first with network fallback */
+const CACHE = ${JSON.stringify(cacheName)};
+const PAGE  = ${JSON.stringify(pageUrl)};
+
+self.addEventListener('install', e => {
+    e.waitUntil(
+        caches.open(CACHE).then(cache => cache.add(PAGE))
+              .then(() => self.skipWaiting())
+    );
+});
+
+self.addEventListener('activate', e => {
+    e.waitUntil(
+        caches.keys()
+              .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+              .then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', e => {
+    /* Only handle GET requests for our own origin */
+    if (e.request.method !== 'GET') return;
+    const url = new URL(e.request.url);
+    if (url.origin !== location.origin) return;
+
+    e.respondWith(
+        caches.match(e.request).then(cached => {
+            if (cached) return cached;
+            return fetch(e.request).then(response => {
+                /* Cache successful same-origin responses */
+                if (response && response.status === 200) {
+                    const clone = response.clone();
+                    caches.open(CACHE).then(c => c.put(e.request, clone));
+                }
+                return response;
+            });
+        }).catch(() => caches.match(PAGE))
+    );
+});
+
+/* Message handler: force update on demand */
+self.addEventListener('message', e => {
+    if (e.data === 'skipWaiting') self.skipWaiting();
+});
+`;
+    },
 
     _deferredPrompt: null,
     _reg: null,
 
-    /* ────────────────────────────────────────────────────────────────────
-       ARCHITECTURE: BLOB-URL SERVICE WORKER (correct for single-file PWA)
-       ──────────────────────────────────────────────────────────────────
-       A single HTML file cannot expose a real /sw.js endpoint, so we
-       compile the SW source into a Blob and register that.
-
-       Offline-after-restart works because:
-         1. On first online visit: SW installs, caches the page HTML.
-         2. Chrome also stores the start_url in its internal PWA store
-            when the app is installed to the home screen.
-         3. On restart (online or offline): Chrome loads the page from
-            its internal PWA cache / Cache Storage.
-         4. Page JS runs → new blob URL created → SW re-registers.
-            If an old SW is still alive Chrome reuses it; if not, the
-            new SW activates and serves from Cache Storage.
-
-       Key requirements for this to work:
-         • The app MUST be installed via "Add to Home Screen".
-         • The user must have visited at least once while online so the
-           SW could run its install event and cache the page.
-         • updateViaCache:'all' is set so Chrome uses Cache Storage for
-           SW script validation instead of always hitting the network.
-    ──────────────────────────────────────────────────────────────────── */
-
-    _buildSwSource(cacheName, pageUrl) {
-        return [
-            '/* Ledgie Service Worker */',
-            'const CACHE = ' + JSON.stringify(cacheName) + ';',
-            'const PAGE  = ' + JSON.stringify(pageUrl) + ';',
-            '',
-            'self.addEventListener("install", e => {',
-            '    e.waitUntil(',
-            '        caches.open(CACHE)',
-            '            .then(cache => cache.add(new Request(PAGE, { cache: "reload" })))',
-            '            .then(() => self.skipWaiting())',
-            '            .catch(err => { console.warn("SW install cache.add failed:", err); self.skipWaiting(); })',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("activate", e => {',
-            '    e.waitUntil(',
-            '        caches.keys()',
-            '            .then(keys => Promise.all(',
-            '                keys.filter(k => k !== CACHE).map(k => caches.delete(k))',
-            '            ))',
-            '            .then(() => self.clients.claim())',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("fetch", e => {',
-            '    if (e.request.method !== "GET") return;',
-            '    const url = new URL(e.request.url);',
-            '    if (url.origin !== location.origin) return;',
-            '    e.respondWith(',
-            '        caches.match(e.request).then(cached => {',
-            '            if (cached) return cached;',
-            '            return fetch(e.request).then(res => {',
-            '                if (res && res.status === 200) {',
-            '                    caches.open(CACHE).then(c => c.put(e.request, res.clone()));',
-            '                }',
-            '                return res;',
-            '            });',
-            '        }).catch(() => caches.match(PAGE))',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("message", e => {',
-            '    if (e.data === "skipWaiting") self.skipWaiting();',
-            '});'
-        ].join('\n');
-    },
-
-    /* ── Inject manifest ────────────────────────────────────────────── */
+    /* ── Inject <link rel="manifest"> dynamically ───────────────────── */
     _injectManifest() {
         const manifest = {
             name: 'Ledgie — Smart Ledger',
@@ -936,88 +900,73 @@ const PwaManager = {
             ]
         };
         const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        const url  = URL.createObjectURL(blob);
         const link = document.createElement('link');
-        link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
+        link.rel = 'manifest'; link.href = url;
         document.head.appendChild(link);
 
+        // Apple touch icon
         const appleIcon = document.createElement('link');
         appleIcon.rel = 'apple-touch-icon'; appleIcon.href = this._icon;
         document.head.appendChild(appleIcon);
-
+        // Favicon
         const favicon = document.createElement('link');
         favicon.rel = 'icon'; favicon.type = 'image/svg+xml'; favicon.href = this._icon;
         document.head.appendChild(favicon);
     },
 
-    /* ── Register SW via blob URL ───────────────────────────────────── */
+    /* ── Register SW from Blob URL ──────────────────────────────────── */
     async _registerSW() {
         if (!('serviceWorker' in navigator)) return false;
-
         const pageUrl   = location.href.split('#')[0];
-        const cacheName = 'ledgie-v11-' + pageUrl.replace(/[^a-z0-9]/gi, '_').slice(-40);
-        const swSource  = this._buildSwSource(cacheName, pageUrl);
+        const cacheName = 'ledgie-v9-' + pageUrl.replace(/[^a-z0-9]/gi, '_').slice(-40);
+        const swSource  = this._swSource(cacheName, pageUrl);
         const swBlob    = new Blob([swSource], { type: 'application/javascript' });
-        const swBlobUrl = URL.createObjectURL(swBlob);
+        const swUrl     = URL.createObjectURL(swBlob);
 
         try {
-            /* Use updateViaCache:'all' — tells Chrome not to bypass Cache Storage
-               when checking if the SW script needs updating. Without this, Chrome
-               always network-fetches the SW script URL on startup, which fails
-               for blob URLs after a browser restart. With 'all', if the SW is
-               already active in Chrome's SW database, Chrome trusts it without
-               re-fetching the blob (which no longer exists after restart). */
-            const reg = await navigator.serviceWorker.register(swBlobUrl, {
-                scope: './',
-                updateViaCache: 'all'
-            });
+            const reg = await navigator.serviceWorker.register(swUrl, { scope: './' });
             this._reg = reg;
 
-            await new Promise(resolve => {
+            // Wait for the SW to become active
+            await new Promise((resolve) => {
                 if (reg.active) { resolve(); return; }
                 const sw = reg.installing || reg.waiting;
                 if (!sw) { resolve(); return; }
-                sw.addEventListener('statechange', function h() {
-                    if (sw.state === 'activated') { sw.removeEventListener('statechange', h); resolve(); }
+                sw.addEventListener('statechange', function onState() {
+                    if (sw.state === 'activated') { sw.removeEventListener('statechange', onState); resolve(); }
                 });
-                setTimeout(resolve, 5000); // safety timeout
-            });
-
-            /* Belt-and-suspenders: explicitly cache the page now while online.
-               The SW install event also does this, but race conditions can occur. */
-            navigator.serviceWorker.ready.then(async () => {
-                try {
-                    const cache = await caches.open(cacheName);
-                    const hit   = await cache.match(pageUrl);
-                    if (!hit) {
-                        const resp = await fetch(pageUrl, { cache: 'reload' });
-                        if (resp.ok) await cache.put(pageUrl, resp);
-                    }
-                } catch (_) {}
             });
 
             document.getElementById('pwa-badge').style.display = 'inline';
             return true;
-        } catch (err) {
-            console.error('SW blob registration failed:', err);
+        } catch(e) {
+            // Blob URL SW registration may be blocked in some browsers (e.g. Firefox)
+            // Silently fall back — app still works, just not installable
+            console.warn('SW registration failed (blob URL may not be supported):', e.message);
             return false;
         }
     },
 
-    /* ── Public init ────────────────────────────────────────────────── */
+    /* ── Public init — called on page load ─────────────────────────── */
     async init() {
         this._injectManifest();
         const swOk = await this._registerSW();
 
-        window.addEventListener('offline', () => log('📴 Offline — running from cache.', 'warn'));
+        // Network status logging
+        window.addEventListener('offline', () => log('📴 Offline — app running from cache.', 'warn'));
         window.addEventListener('online',  () => log('📶 Back online.', 'success'));
 
+        // Capture the beforeinstallprompt so we can trigger it via "install" command
         window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
             this._deferredPrompt = e;
+            // Show a subtle hint badge on the install button if it exists
             const badge = document.getElementById('pwa-badge');
             if (badge) { badge.style.display = 'inline'; badge.title = 'App can be installed — type: install'; }
         });
 
+        // Detect when installed
         window.addEventListener('appinstalled', () => {
             this._deferredPrompt = null;
             log('✓ Ledgie installed as an app!', 'success');
@@ -1026,46 +975,7 @@ const PwaManager = {
         return swOk;
     },
 
-    /* ── pwa status (async, checks real browser state) ──────────────── */
-    async showStatus() {
-        const hasSW      = 'serviceWorker' in navigator;
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-        let swState = '✗ Not registered';
-        let swColor = 'var(--error)';
-        let cacheInfo = '—';
-
-        if (hasSW) {
-            try {
-                const reg = await navigator.serviceWorker.getRegistration();
-                if (reg) {
-                    const sw = reg.active || reg.installing || reg.waiting;
-                    swState = sw ? ('✓ ' + (reg.active ? 'Active' : reg.waiting ? 'Waiting' : 'Installing')) : '⚠ Registered (no worker)';
-                    swColor = reg.active ? 'var(--success)' : 'var(--warn)';
-                    this._reg = reg; // refresh in-memory ref
-                } 
-            } catch(e) { swState = '✗ Error: ' + e.message; }
-
-            try {
-                const keys  = await caches.keys();
-                const sizes = await Promise.all(keys.map(async k => {
-                    const c = await caches.open(k);
-                    const r = await c.keys();
-                    return r.length;
-                }));
-                const total = sizes.reduce((a,b)=>a+b,0);
-                cacheInfo = keys.length + ' cache(s), ' + total + ' entr' + (total===1?'y':'ies');
-            } catch(_) {}
-        }
-
-        log(`<div class="pnl-head">PWA STATUS</div>
-            <div class="stat-row"><span>Service Worker API</span><span style="color:${hasSW?'var(--success)':'var(--error)'}">${hasSW?'✓ Supported':'✗ Not available'}</span></div>
-            <div class="stat-row"><span>SW Registered</span><span style="color:${swColor}">${swState}</span></div>
-            <div class="stat-row"><span>Installed as App</span><span style="color:${isStandalone?'var(--success)':'var(--accent)'}">${isStandalone?'✓ Standalone':'Browser tab'}</span></div>
-            <div class="stat-row"><span>Cache Storage</span><span style="color:var(--accent)">${cacheInfo}</span></div>
-            <div class="stat-row"><span>Connection</span><span style="color:${navigator.onLine?'var(--success)':'var(--warn)'}">${navigator.onLine?'Online':'Offline'}</span></div>`);
-    },
-
-    /* ── Trigger install prompt ─────────────────────────────────────── */
+    /* ── Trigger install prompt (called by "install" command) ───────── */
     async promptInstall() {
         if (this._deferredPrompt) {
             this._deferredPrompt.prompt();
@@ -1075,28 +985,29 @@ const PwaManager = {
             else log('Install dismissed.', 'system');
             return;
         }
+        // No prompt available — give platform-specific guidance
         const ua = navigator.userAgent;
         if (/iPhone|iPad|iPod/.test(ua)) {
             log('📱 iOS: Tap the <b>Share</b> button → <b>Add to Home Screen</b>', 'system');
         } else if (/Android/.test(ua)) {
             log('🤖 Android: Tap the browser menu → <b>Add to Home screen</b> or <b>Install app</b>', 'system');
         } else {
-            log('🖥️ Desktop: Click the install icon (⊕) in your browser\'s address bar.', 'system');
+            log('🖥️ Desktop: Click the <b>install icon</b> (⊕) in your browser\'s address bar.', 'system');
+            log('If not visible, the page may need to be served over HTTPS.', 'system');
         }
     },
 
-    /* ── Force SW update ────────────────────────────────────────────── */
+    /* ── Force SW update ─────────────────────────────────────────────── */
     async update() {
-        const reg = this._reg || await navigator.serviceWorker.getRegistration().catch(()=>null);
-        if (!reg) { log('No service worker registered.', 'warn'); return; }
-        await reg.update();
-        log('✓ Update check triggered. Reload to apply if found.', 'success');
+        if (!this._reg) { log('No service worker registered.', 'warn'); return; }
+        await this._reg.update();
+        log('✓ Update check triggered. Reload to apply if an update was found.', 'success');
     }
 };
 
 // Boot PWA on load
 PwaManager.init().then(ok => {
-    if (!ok) console.info('Service Worker not available in this browser.');
+    if (!ok) console.info('Service Worker not available (blob URL registration unsupported in this browser).');
 });
 
 /* =========================================
@@ -1862,15 +1773,8 @@ function reconstructFile() {
     let out = '';
     // Header comments
     if (headerLines.length > 0) {
-        // Keep non-empty header lines, skip sequences of multiple blank lines
-        let prevBlank = false;
-        headerLines.forEach(l => {
-            const isEmpty = !l.trim();
-            if (isEmpty && prevBlank) return; // collapse consecutive blanks
-            out += l + '\n';
-            prevBlank = isEmpty;
-        });
-        if (!out.endsWith('\n\n')) out += '\n';
+        headerLines.forEach(l => { if (l.trim()) out += l + '\n'; });
+        out += '\n';
     }
     // Directives (account, commodity, alias, include, P, etc.)
     if (directiveLines.length > 0) {
@@ -2605,7 +2509,7 @@ const ENGINE = {
         'sub_exp': { options: ['copy', 'file', 'csv', 'json'], next: [], icon: '📄' },
         'config': { type: 'cmd', next: ['sub_conf'], icon: '⚙️' },
         'sub_conf': { branches: { 'theme': 'sub_theme', 'budget': 'sub_budget', 'set': 'sub_conf_set' }, options: ['list', 'strict'], next: [], icon: '🔧' },
-        'sub_theme': { options: ['matrix', 'dracula', 'paper', 'solarized', 'catppuccin', 'nord', 'monokai', 'default', 'reset', 'font', 'bg', 'text'], next: ['text'], icon: '🎨' },
+        'sub_theme': { options: ['matrix', 'dracula', 'paper', 'solarized', 'catppuccin', 'default', 'reset', 'font', 'bg', 'text'], next: ['text'], icon: '🎨' },
         'sub_budget': { options: ['set', 'rm', 'list'], next: ['acc'], icon: '💰' },
         'sub_conf_set': { next: ['text'], icon: '✏️' },
         'ledger': { type: 'cmd', next: ['sub_ledg'], icon: '📚' },
@@ -2777,7 +2681,7 @@ const HledgerLinter = {
         }
         // Header must have description (after date/flag/code)
         const hm = rawHeader.match(/^(\d{4}[-./]\d{2}[-./]\d{2})(?:=\d{4}[-./]\d{2}[-./]\d{2})?\s*[!*]?\s*(?:\([^)]*\)\s*)?(.*?)\s*(;.*)?$/);
-        if (hm && !hm[2]?.trim()) { errors.push(`Transaction missing description.`); }
+        if (hm && !hm[1]) { errors.push(`Transaction missing description.`); }
 
         // Filter postings: skip pure comment lines, keep indented account lines
         const postings = lines.slice(1).filter(p => {
@@ -3086,15 +2990,10 @@ const Editor = {
         const isHeader    = val.lastIndexOf('\n', lineStart - 1) === -1 && lineStart === 0;
         const isPostingLine = !isHeader && lineContent.length >= 4;
 
-        // TAB → accept top chip or ghost suffix
+        // TAB → accept top chip
         if (e.key === 'Tab') {
             e.preventDefault();
-            // If ghost suffix is set and cursor is at end of an account word, accept it
-            if (this._ghostSuffix && this.suggestions.length > 0) {
-                this.insert(this.suggestions[0].text);
-            } else if (this.suggestions.length > 0) {
-                this.insert(this.suggestions[0].text);
-            }
+            if (this.suggestions.length > 0) this.insert(this.suggestions[0].text);
             return;
         }
 
@@ -3515,16 +3414,6 @@ function log(msg, type='text') {
     content.appendChild(frag); container.scrollTop = container.scrollHeight;
 }
 
-let _toastTimer = null;
-function toast(msg, dur = 2000) {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
-}
-
 async function run(raw) {
     const val = raw.trim(); if (!val) return;
     if (ConfirmationMode.active) { return ConfirmationMode.process(val.toLowerCase()); } 
@@ -3574,7 +3463,7 @@ async function run(raw) {
     if (verb === 'tutorial') {
         const sub = args[0];
         if (!sub || sub === 'basics') { log(`<div class="pnl-head">BASICS</div><div class="help-cmd"><span>add</span><span>Open Smart Editor to record a transaction</span></div><div class="help-cmd"><span>dash</span><span>View net worth &amp; monthly summary</span></div><div class="help-cmd"><span>bal assets</span><span>Check account balances</span></div><div class="help-cmd"><span>reg expenses</span><span>Transaction register with running total</span></div><div class="help-cmd"><span>graph income expenses</span><span>Visual spending chart</span></div><div class="help-cmd"><span>mount</span><span>Link a .hledger file for persistent storage</span></div>`); }
-        else if (sub === 'tips') { log(`<div class="pnl-head">POWER TIPS</div><div class="help-cmd"><span>graph expenses type:bar by:month</span><span>Monthly bar chart</span></div><div class="help-cmd"><span>reg expenses date:thismonth</span><span>This month only</span></div><div class="help-cmd"><span>bal -liabilities</span><span>Exclude liabilities</span></div><div class="help-cmd"><span>config budget set food 500</span><span>Set spending limit</span></div><div class="help-cmd"><span>recur groceries</span><span>Repeat a past transaction</span></div><div class="help-cmd"><span>export csv</span><span>Download as spreadsheet</span></div><div class="help-cmd"><span>config theme nord</span><span>Themes: matrix, dracula, paper, solarized, catppuccin, nord, monokai</span></div><div class="help-cmd"><span>net</span><span>Quick net worth summary</span></div><div class="help-cmd"><span>n (empty input)</span><span>Quick shortcut: new transaction</span></div><div class="help-cmd"><span>p (empty input)</span><span>Quick shortcut: P&amp;L statement</span></div>`); }
+        else if (sub === 'tips') { log(`<div class="pnl-head">POWER TIPS</div><div class="help-cmd"><span>graph expenses type:bar by:month</span><span>Monthly bar chart</span></div><div class="help-cmd"><span>reg expenses date:thismonth</span><span>This month only</span></div><div class="help-cmd"><span>bal -liabilities</span><span>Exclude liabilities</span></div><div class="help-cmd"><span>config budget set food 500</span><span>Set spending limit</span></div><div class="help-cmd"><span>recur groceries</span><span>Repeat a past transaction</span></div><div class="help-cmd"><span>export csv</span><span>Download as spreadsheet</span></div><div class="help-cmd"><span>config theme solarized</span><span>Themes: matrix, dracula, paper, solarized, catppuccin</span></div><div class="help-cmd"><span>net</span><span>Quick net worth summary</span></div>`); }
         else if (sub === 'backup') { log(`<div class="pnl-head">BACKUP &amp; SYNC</div><div class="help-cmd"><span>install</span><span>Install as offline app (no internet needed after install)</span></div><div class="help-cmd"><span>pwa status</span><span>Check installation &amp; service worker status</span></div><div class="help-cmd"><span>mount</span><span>Pick a .hledger file (opens file picker)</span></div><div class="help-cmd"><span>remount</span><span>Re-link previously mounted file silently</span></div><div class="help-cmd"><span>unmount</span><span>Disconnect file link &amp; forget it</span></div><div class="help-cmd"><span>export</span><span>Download .hledger snapshot</span></div><div class="help-cmd"><span>export copy</span><span>Copy raw ledger to clipboard</span></div><div class="help-cmd"><span>ledger import</span><span>Load a .hledger file (appends)</span></div>`, 'text'); }
         else { log(`tutorial [basics|tips|backup]`, 'system'); }
     }
@@ -3587,7 +3476,7 @@ async function run(raw) {
         );
         if (!results.length) { log(`No results for "${escapeHtml(q)}".`, 'system'); return; }
         const escQ = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-        const highlight = (s) => escapeHtml(s).replace(new RegExp(escQ, 'gi'), m => `<span class="search-highlight">${m}</span>`);
+        const highlight = (s) => escapeHtml(s).replace(new RegExp(escQ.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi'), m => `<span class="search-highlight">${m}</span>`);
         log(`<div class="search-count">${results.length} result${results.length!==1?'s':''} for "<b>${escapeHtml(q)}</b>"</div>`);
         results.slice(0, 30).forEach(t => {
             const postHtml = t.posts.map(p => `<div class="search-result-post">${highlight(p.acc)}${p.rawAmt ? '  ' + highlight(p.rawAmt) : ''}</div>`).join('');
@@ -3692,8 +3581,6 @@ async function run(raw) {
         let assets = 0, liabilities = 0, inc = 0, exp = 0; 
         let cats = {}; 
         const now = new Date(); const ym = now.toISOString().slice(0, 7);
-        const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0, 7);
-        let lastInc = 0, lastExp = 0;
         // Detect dominant commodity
         const commCount = {};
         transactions.forEach(t => {
@@ -3712,15 +3599,10 @@ async function run(raw) {
                     } 
                 }); 
             }
-            if (t.date.startsWith(lastMonth)) {
-                t.posts.forEach(p => {
-                    if (p.acc.startsWith('income')) lastInc = Math.round((lastInc + p.val + Number.EPSILON) * 100) / 100;
-                    else if (p.acc.startsWith('expenses')) lastExp = Math.round((lastExp + p.val + Number.EPSILON) * 100) / 100;
-                });
-            }
         });
         // Dominant commodity symbol — detect position from actual postings
         const domComm = Object.entries(commCount).sort((a,b) => b[1]-a[1])[0]?.[0] || '';
+        // Detect position of dominant commodity
         let domPos = 'right';
         if (domComm) {
             const samplePost = transactions.map(t => t.posts).flat().find(p => p.comm === domComm);
@@ -3729,51 +3611,22 @@ async function run(raw) {
         const fmt = (v) => domComm ? fmtAmt(Math.abs(v), domComm, domPos) : fmtNum(Math.abs(v));
         const netWorth = Math.round((assets + liabilities + Number.EPSILON) * 100) / 100;
         const monthlyNet = Math.round((inc + exp + Number.EPSILON) * 100) / 100;
-        const lastMonthlyNet = Math.round((lastInc + lastExp + Number.EPSILON) * 100) / 100;
         const savingsRate = Math.abs(inc) > 0.01 ? (monthlyNet / Math.abs(inc) * 100) : 0;
         const topCat = Object.entries(cats).sort((a,b) => b[1]-a[1])[0]; 
         const activeDays = new Set(transactions.filter(t => t.date.startsWith(ym)).map(t => t.date)).size;
         const errorCount = transactions.filter(t => t._error).length;
         
-        // Month-over-month change helpers
-        const mom = (cur, prev) => {
-            if (Math.abs(prev) < 0.01) return '';
-            const pct = ((Math.abs(cur) - Math.abs(prev)) / Math.abs(prev) * 100);
-            const sign = pct >= 0 ? '▲' : '▼';
-            const col = pct >= 0 ? 'var(--error)' : 'var(--success)'; // more expense = bad
-            return `<span style="font-size:10px;color:${col}"> ${sign}${Math.abs(pct).toFixed(0)}%</span>`;
-        };
-        const momInc = (cur, prev) => {
-            if (Math.abs(prev) < 0.01) return '';
-            const pct = ((Math.abs(cur) - Math.abs(prev)) / Math.abs(prev) * 100);
-            const sign = pct >= 0 ? '▲' : '▼';
-            const col = pct >= 0 ? 'var(--success)' : 'var(--error)'; // more income = good
-            return `<span style="font-size:10px;color:${col}"> ${sign}${Math.abs(pct).toFixed(0)}%</span>`;
-        };
-        
-        // Top expense categories
-        const topCats = Object.entries(cats).sort((a,b) => b[1]-a[1]).slice(0,3);
-        let catsHtml = '';
-        if (topCats.length > 0) {
-            const maxCat = Math.abs(topCats[0][1]);
-            catsHtml = `<div class="dash-card" style="grid-column:span 2"><div class="dash-label">Top Expenses — ${ym}</div>${
-                topCats.map(([cat,val]) => {
-                    const pct = maxCat > 0 ? (Math.abs(val)/maxCat*100) : 0;
-                    return `<div style="margin-top:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span>${escapeHtml(cat)}</span><span style="color:var(--error)">${fmt(Math.abs(val))}</span></div><div style="height:5px;background:var(--ghost);border-radius:3px;overflow:hidden"><div style="width:${pct.toFixed(0)}%;height:100%;background:var(--error);opacity:0.7;border-radius:3px"></div></div></div>`;
-                }).join('')
-            }</div>`;
-        }
-        
         const html = `<div class="dash-grid">
             <div class="dash-card"><div class="dash-label">Net Worth</div><div class="dash-val" style="color:${netWorth>=0?'var(--success)':'var(--error)'}">${fmt(netWorth)}</div></div>
             <div class="dash-card"><div class="dash-label">Month Net (${ym})</div><div class="dash-val" style="color:${monthlyNet>=0?'var(--success)':'var(--error)'}">${fmt(monthlyNet)}</div></div>
-            <div class="dash-card"><div class="dash-label">Income</div><div class="dash-val" style="color:var(--success)">${fmt(Math.abs(inc))}${momInc(inc, lastInc)}</div></div>
-            <div class="dash-card"><div class="dash-label">Expenses</div><div class="dash-val" style="color:var(--error)">${fmt(Math.abs(exp))}${mom(exp, lastExp)}</div></div>
+            <div class="dash-card"><div class="dash-label">Income</div><div class="dash-val" style="color:var(--success)">${fmt(Math.abs(inc))}</div></div>
+            <div class="dash-card"><div class="dash-label">Expenses</div><div class="dash-val" style="color:var(--error)">${fmt(Math.abs(exp))}</div></div>
             <div class="dash-card"><div class="dash-label">Savings Rate</div><div class="dash-val" style="color:${savingsRate>=20?'var(--success)':savingsRate>=0?'var(--warn)':'var(--error)'}">${savingsRate.toFixed(1)}%</div></div>
-            <div class="dash-card"><div class="dash-label">Accounts · Transactions</div><div class="dash-val">${ENGINE.accounts.length} · ${transactions.length}</div>
+            <div class="dash-card"><div class="dash-label">Top Expense</div><div class="dash-val" style="color:var(--error);font-size:14px">${topCat ? escapeHtml(topCat[0]) : '—'}</div></div>
+            <div class="dash-card"><div class="dash-label">Transactions</div><div class="dash-val">${transactions.length}</div></div>
+            <div class="dash-card"><div class="dash-label">Active Days</div><div class="dash-val">${activeDays}</div>
             ${errorCount > 0 ? `<div class="dash-label" style="color:var(--error);margin-top:4px">⚠ ${errorCount} error${errorCount!==1?'s':''} — run check</div>` : ''}
             </div>
-            ${catsHtml}
         </div>`;
         log(html);
     }
@@ -3791,7 +3644,16 @@ async function run(raw) {
     else if (verb === 'pwa') { 
         const sub = args[0];
         if (sub === 'update') { PwaManager.update(); }
-        else if (sub === 'status') { await PwaManager.showStatus(); }
+        else if (sub === 'status') {
+            const hasSW = 'serviceWorker' in navigator;
+            const reg = PwaManager._reg;
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+            log(`<div class="pnl-head">PWA STATUS</div>
+                <div class="stat-row"><span>Service Worker API</span><span style="color:${hasSW?'var(--success)':'var(--error)'}">${hasSW?'✓ Supported':'✗ Not available'}</span></div>
+                <div class="stat-row"><span>SW Registered</span><span style="color:${reg?'var(--success)':'var(--error)'}">${reg?'✓ Active':'✗ Not registered'}</span></div>
+                <div class="stat-row"><span>Installed as App</span><span style="color:${isInstalled?'var(--success)':'var(--accent)'}">${isInstalled?'✓ Yes':'No (browser tab)'}</span></div>
+                <div class="stat-row"><span>Connection</span><span style="color:${navigator.onLine?'var(--success)':'var(--warn)'}">${navigator.onLine?'Online':'Offline'}</span></div>`);
+        }
         else { log(`<div class="pnl-head">PWA COMMANDS</div><div class="help-cmd"><span>pwa status</span><span>Installation &amp; SW status</span></div><div class="help-cmd"><span>pwa update</span><span>Check for app update</span></div><div class="help-cmd"><span>install</span><span>Prompt to install as native app</span></div>`, 'system'); }
     }
     else if (verb === 'install') { PwaManager.promptInstall(); }
@@ -4293,12 +4155,7 @@ async function run(raw) {
         if (transactions.length === 0) { log("Nothing to undo.", 'warn'); return; } 
         // Backup before undo
         Persistence.autoBackup(LedgerManager.getRaw());
-        // Remove the last transaction by date order (most recently entered or latest date)
-        const lastIdx = transactions.reduce((best, t, i) => 
-            t.date > transactions[best].date ? i : best, 0);
-        const removed = transactions.splice(lastIdx, 1)[0];
-        // Re-number IDs
-        transactions.forEach((t, i) => t.id = i);
+        const removed = transactions.pop(); 
         const safeRaw = reconstructFile(); 
         LedgerManager.save(safeRaw); 
         LedgerManager.loadRaw(safeRaw); 
@@ -4448,7 +4305,7 @@ async function run(raw) {
         const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const ledgerName = LedgerManager.current;
         if (args[0] === 'copy') { 
-            navigator.clipboard.writeText(rawData).then(() => { toast(`✓ Copied ${rawData.split('\n').length} lines to clipboard`); log(`✓ ${rawData.split('\n').length} lines copied to clipboard.`, 'success'); })
+            navigator.clipboard.writeText(rawData).then(() => log(`✓ ${rawData.split('\n').length} lines copied to clipboard.`, 'success'))
                 .catch(() => log("Clipboard write failed. Try export file instead.", 'error')); 
         } else if (args[0] === 'csv') { 
             let csv = "Date,Status,Description,Account,Amount,Commodity,Comment\n"; 
@@ -4601,7 +4458,7 @@ async function run(raw) {
         html += h('CONFIG', [
             ['config list', 'Show all settings'],
             ['config strict', 'Toggle strict validation mode'],
-            ['config theme solarized', 'Set theme (matrix/dracula/paper/solarized/catppuccin/nord/monokai)'],
+            ['config theme solarized', 'Set theme (matrix/dracula/paper/solarized/catppuccin)'],
             ['config theme reset', 'Reset to default theme'],
             ['config budget set food 500', 'Set monthly budget for a category'],
             ['config budget list', 'View budgets & progress'],
@@ -4614,7 +4471,7 @@ async function run(raw) {
             ['alias list', 'List all aliases'],
             ['alias rm <key>', 'Remove alias'],
         ]);
-        html += h('KEYS', [['↑ ↓', 'Command history'],['Tab / →', 'Autocomplete'],['Ctrl+L', 'Clear screen'],['d / r / b', 'dash/recent/bal (empty input)'],['n', 'New transaction (add)'],['p', 'P&L statement'],['?', 'Quick reference']]); 
+        html += h('KEYS', [['↑ ↓', 'Command history'],['Tab / →', 'Autocomplete'],['Ctrl+L', 'Clear screen'],['d / r / b', 'dash/recent/bal (empty input)'],['?', 'Quick reference']]); 
         log(html); 
     }
     else { log(`Unknown command: <b>${escapeHtml(verb)}</b>. Type <span style="cursor:pointer;color:var(--primary)" onclick="run('help')">help</span> or press <span style="cursor:pointer;color:var(--primary)" onclick="toggleKeys()">?</span> for reference.`, 'error'); }
@@ -5088,44 +4945,15 @@ input.addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowDown') { e.preventDefault(); const h = CmdHistory.dn(); input.value = h; updatePrediction(); }
     else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); content.innerHTML = ''; }
     else if (e.key === '?' && !input.value) { e.preventDefault(); toggleKeys(); }
-    else if ((e.key === 'd' || e.key === 'r' || e.key === 'b' || e.key === 'w' || e.key === 'n' || e.key === 'p') && !input.value && !e.ctrlKey && !e.metaKey) {
+    else if ((e.key === 'd' || e.key === 'r' || e.key === 'b' || e.key === 'w') && !input.value && !e.ctrlKey && !e.metaKey) {
         // Single-key shortcuts when input is empty
         if (e.key === 'd') { e.preventDefault(); run('dash'); }
         else if (e.key === 'r') { e.preventDefault(); run('recent'); }
         else if (e.key === 'b') { e.preventDefault(); run('bal'); }
         else if (e.key === 'w') { e.preventDefault(); run('waterfall'); }
-        else if (e.key === 'n') { e.preventDefault(); run('add'); }
-        else if (e.key === 'p') { e.preventDefault(); run('pnl'); }
     }
 });
 if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; setTimeout(() => inputWrapper.scrollIntoView({behavior: "auto", block: "end"}), 50); container.scrollTop = container.scrollHeight; }); }
-
-// Escape key to close open modals
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        if (document.getElementById('editor-modal').classList.contains('open')) { Editor.close(); return; }
-        if (document.getElementById('coa-modal').classList.contains('open')) { COAEditor.close(); return; }
-        if (document.getElementById('keys-modal').classList.contains('open')) { toggleKeys(); return; }
-    }
-});
-
-// Swipe down to dismiss modals on mobile
-(function setupSwipeDismiss() {
-    const modals = ['editor-modal', 'coa-modal'];
-    modals.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        let startY = 0;
-        el.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
-        el.addEventListener('touchend', e => {
-            const dy = e.changedTouches[0].clientY - startY;
-            if (dy > 80) {
-                if (id === 'editor-modal') Editor.close();
-                else COAEditor.close();
-            }
-        }, { passive: true });
-    });
-})();
 
 // INIT
 LedgerManager.load(); run('dash'); updatePrediction();
