@@ -840,96 +840,18 @@ function isValidRoot(name) { return FIXED_ROOTS.includes(name.split(':')[0]); }
    capable without requiring any external sw.js file.
    ========================================= */
 const PwaManager = {
-    /* ── SVG icon ────────────────────────────────────────────────────── */
     _icon: `data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="%230f172a"/><rect x="24" y="56" width="144" height="4" rx="2" fill="%2338bdf8"/><rect x="24" y="72" width="96" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="84" width="112" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="96" width="80" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="108" width="100" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="120" width="88" height="3" rx="1.5" fill="%23475569"/><rect x="120" y="68" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="80" width="48" height="3" rx="1.5" fill="%23f87171"/><rect x="120" y="92" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="104" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="116" width="48" height="3" rx="1.5" fill="%23f87171"/><text x="96" y="42" text-anchor="middle" font-family="monospace" font-size="20" font-weight="bold" fill="%2338bdf8">LEDGIE</text><rect x="24" y="132" width="144" height="2" rx="1" fill="%2338bdf8" opacity="0.4"/><text x="96" y="158" text-anchor="middle" font-family="monospace" font-size="13" fill="%2364748b">ledger</text></svg>`,
 
     _deferredPrompt: null,
     _reg: null,
 
-    /* ────────────────────────────────────────────────────────────────────
-       ARCHITECTURE: BLOB-URL SERVICE WORKER (correct for single-file PWA)
-       ──────────────────────────────────────────────────────────────────
-       A single HTML file cannot expose a real /sw.js endpoint, so we
-       compile the SW source into a Blob and register that.
-
-       Offline-after-restart works because:
-         1. On first online visit: SW installs, caches the page HTML.
-         2. Chrome also stores the start_url in its internal PWA store
-            when the app is installed to the home screen.
-         3. On restart (online or offline): Chrome loads the page from
-            its internal PWA cache / Cache Storage.
-         4. Page JS runs → new blob URL created → SW re-registers.
-            If an old SW is still alive Chrome reuses it; if not, the
-            new SW activates and serves from Cache Storage.
-
-       Key requirements for this to work:
-         • The app MUST be installed via "Add to Home Screen".
-         • The user must have visited at least once while online so the
-           SW could run its install event and cache the page.
-         • updateViaCache:'all' is set so Chrome uses Cache Storage for
-           SW script validation instead of always hitting the network.
-    ──────────────────────────────────────────────────────────────────── */
-
-    _buildSwSource(cacheName, pageUrl) {
-        return [
-            '/* Ledgie Service Worker */',
-            'const CACHE = ' + JSON.stringify(cacheName) + ';',
-            'const PAGE  = ' + JSON.stringify(pageUrl) + ';',
-            '',
-            'self.addEventListener("install", e => {',
-            '    e.waitUntil(',
-            '        caches.open(CACHE)',
-            '            .then(cache => cache.add(new Request(PAGE, { cache: "reload" })))',
-            '            .then(() => self.skipWaiting())',
-            '            .catch(err => { console.warn("SW install cache.add failed:", err); self.skipWaiting(); })',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("activate", e => {',
-            '    e.waitUntil(',
-            '        caches.keys()',
-            '            .then(keys => Promise.all(',
-            '                keys.filter(k => k !== CACHE).map(k => caches.delete(k))',
-            '            ))',
-            '            .then(() => self.clients.claim())',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("fetch", e => {',
-            '    if (e.request.method !== "GET") return;',
-            '    const url = new URL(e.request.url);',
-            '    if (url.origin !== location.origin) return;',
-            '    e.respondWith(',
-            '        caches.match(e.request).then(cached => {',
-            '            if (cached) return cached;',
-            '            return fetch(e.request).then(res => {',
-            '                if (res && res.status === 200) {',
-            '                    caches.open(CACHE).then(c => c.put(e.request, res.clone()));',
-            '                }',
-            '                return res;',
-            '            });',
-            '        }).catch(() => caches.match(PAGE))',
-            '    );',
-            '});',
-            '',
-            'self.addEventListener("message", e => {',
-            '    if (e.data === "skipWaiting") self.skipWaiting();',
-            '});'
-        ].join('\n');
-    },
-
-    /* ── Inject manifest ────────────────────────────────────────────── */
     _injectManifest() {
         const manifest = {
-            name: 'Ledgie — Smart Ledger',
-            short_name: 'Ledgie',
+            name: 'Ledgie — Smart Ledger', short_name: 'Ledgie',
             description: 'Personal finance ledger, hledger-compatible',
             start_url: location.href.split('#')[0],
-            display: 'standalone',
-            background_color: '#0f172a',
-            theme_color: '#0f172a',
-            orientation: 'any',
-            categories: ['finance', 'productivity'],
+            display: 'standalone', background_color: '#0f172a', theme_color: '#0f172a',
+            orientation: 'any', categories: ['finance', 'productivity'],
             icons: [
                 { src: this._icon, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
                 { src: this._icon, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
@@ -939,55 +861,26 @@ const PwaManager = {
         const link = document.createElement('link');
         link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
         document.head.appendChild(link);
-
         const appleIcon = document.createElement('link');
         appleIcon.rel = 'apple-touch-icon'; appleIcon.href = this._icon;
         document.head.appendChild(appleIcon);
-
         const favicon = document.createElement('link');
         favicon.rel = 'icon'; favicon.type = 'image/svg+xml'; favicon.href = this._icon;
         document.head.appendChild(favicon);
     },
 
-    /* ── Safe log wrapper (log() may not exist yet during early init) ── */
-    _log(msg) {
-        if (typeof log === 'function') { log(msg); }
-        else { (this._pendingLogs = this._pendingLogs || []).push(msg); }
-    },
-    flushLogs() {
-        if (!this._pendingLogs) return;
-        this._pendingLogs.forEach(m => { try { log(m); } catch(_) {} });
-        this._pendingLogs = [];
-    },
-
-    /* ── Register SW via blob URL ───────────────────────────────────── */
     async _registerSW() {
         if (!('serviceWorker' in navigator)) return false;
-
-        // Pre-flight: SW requires HTTPS or localhost
-        const proto = location.protocol;
-        if (proto !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            this._log(`<div class="line warn dismissible">⚠️ SW needs HTTPS. Protocol: <b>${proto}</b> <span class="dismiss-btn" onclick="this.parentElement.remove()">✕</span></div>`);
+        if (location.protocol !== 'https:' && !['localhost','127.0.0.1'].includes(location.hostname)) {
+            log('⚠️ Service Worker requires HTTPS. Offline mode unavailable.', 'warn');
             return false;
         }
-
-        const pageUrl   = location.href.split('#')[0];
-        const cacheName = 'ledgie-v11-' + pageUrl.replace(/[^a-z0-9]/gi, '_').slice(-40);
-        const swSource  = this._buildSwSource(cacheName, pageUrl);
-        const swBlob    = new Blob([swSource], { type: 'application/javascript' });
-        const swBlobUrl = URL.createObjectURL(swBlob);
-
+        /* sw.js must be a real file served with JS MIME type — blob:/data: URLs are
+           blocked by Chrome. sw.js lives in the same directory as this HTML file. */
+        const swUrl = new URL('./sw.js', location.href).href;
         try {
-            /* No scope specified — Chrome defaults scope to the blob URL's own
-               "directory", which for blob:https://host/uuid is the origin root '/'.
-               Specifying scope:'./' would resolve relative to the PAGE path
-               (e.g. /repo/) and Chrome would reject the blob URL as being
-               outside that scope → SecurityError. Omitting scope avoids this. */
-            const reg = await navigator.serviceWorker.register(swBlobUrl, {
-                updateViaCache: 'all'
-            });
+            const reg = await navigator.serviceWorker.register(swUrl, { updateViaCache: 'all' });
             this._reg = reg;
-
             await new Promise(resolve => {
                 if (reg.active) { resolve(); return; }
                 const sw = reg.installing || reg.waiting;
@@ -995,123 +888,105 @@ const PwaManager = {
                 sw.addEventListener('statechange', function h() {
                     if (sw.state === 'activated') { sw.removeEventListener('statechange', h); resolve(); }
                 });
-                setTimeout(resolve, 5000); // safety timeout
+                setTimeout(resolve, 5000);
             });
-
-            /* Belt-and-suspenders: explicitly cache the page now while online.
-               The SW install event also does this, but race conditions can occur. */
+            /* Explicitly cache the page after SW is active (belt-and-suspenders) */
             navigator.serviceWorker.ready.then(async () => {
                 try {
-                    const cache = await caches.open(cacheName);
-                    const hit   = await cache.match(pageUrl);
-                    if (!hit) {
-                        const resp = await fetch(pageUrl, { cache: 'reload' });
-                        if (resp.ok) await cache.put(pageUrl, resp);
+                    const pageUrl = location.href.split('#')[0];
+                    const cacheName = reg.active.scriptURL; // use SW url as cache key hint
+                    const keys = await caches.keys();
+                    const appCache = keys.find(k => k.startsWith('ledgie-v11-'));
+                    if (appCache) {
+                        const c = await caches.open(appCache);
+                        if (!await c.match(pageUrl)) {
+                            const r = await fetch(pageUrl, { cache: 'reload' });
+                            if (r.ok) await c.put(pageUrl, r);
+                        }
                     }
-                } catch (_) {}
+                } catch(_) {}
             });
-
             document.getElementById('pwa-badge').style.display = 'inline';
             return true;
         } catch (err) {
-            console.error('SW blob registration failed:', err);
-            this._log(`<div class="line warn dismissible">⚠️ SW failed: <b>${err.name}: ${err.message}</b> (origin: ${location.origin}) <span class="dismiss-btn" onclick="this.parentElement.remove()">✕</span></div>`);
+            if (err.name === 'TypeError' && err.message.includes('sw.js')) {
+                log(`⚠️ <b>sw.js not found.</b> Place <code>sw.js</code> in the same directory as this HTML file. <a href="https://github.com/eozalp/eozalp.github.io" target="_blank" style="color:var(--primary)">Repo ↗</a>`, 'warn');
+            } else {
+                log(`⚠️ SW registration failed: ${err.message}`, 'warn');
+            }
+            console.error('SW registration failed:', err);
             return false;
         }
     },
 
-    /* ── Public init ────────────────────────────────────────────────── */
     async init() {
         this._injectManifest();
         const swOk = await this._registerSW();
-
         window.addEventListener('offline', () => log('📴 Offline — running from cache.', 'warn'));
         window.addEventListener('online',  () => log('📶 Back online.', 'success'));
-
         window.addEventListener('beforeinstallprompt', e => {
-            e.preventDefault();
-            this._deferredPrompt = e;
+            e.preventDefault(); this._deferredPrompt = e;
             const badge = document.getElementById('pwa-badge');
-            if (badge) { badge.style.display = 'inline'; badge.title = 'App can be installed — type: install'; }
+            if (badge) { badge.style.display = 'inline'; badge.title = 'Type: install'; }
         });
-
-        window.addEventListener('appinstalled', () => {
-            this._deferredPrompt = null;
-            log('✓ Ledgie installed as an app!', 'success');
-        });
-
+        window.addEventListener('appinstalled', () => { this._deferredPrompt = null; log('✓ Ledgie installed!', 'success'); });
         return swOk;
     },
 
-    /* ── pwa status (async, checks real browser state) ──────────────── */
     async showStatus() {
-        const hasSW      = 'serviceWorker' in navigator;
+        const hasSW = 'serviceWorker' in navigator;
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-        let swState = '✗ Not registered';
-        let swColor = 'var(--error)';
-        let cacheInfo = '—';
-
+        let swState = '✗ Not registered', swColor = 'var(--error)', cacheInfo = '—';
         if (hasSW) {
             try {
                 const reg = await navigator.serviceWorker.getRegistration(location.href);
                 if (reg) {
-                    const sw = reg.active || reg.installing || reg.waiting;
-                    swState = sw ? ('✓ ' + (reg.active ? 'Active' : reg.waiting ? 'Waiting' : 'Installing')) : '⚠ Registered (no worker)';
+                    swState = reg.active ? '✓ Active' : reg.waiting ? '⚠ Waiting' : '⚠ Installing';
                     swColor = reg.active ? 'var(--success)' : 'var(--warn)';
-                    this._reg = reg; // refresh in-memory ref
-                } 
-            } catch(e) { swState = '✗ Error: ' + e.message; }
-
+                    this._reg = reg;
+                }
+            } catch(e) { swState = '✗ ' + e.message; }
             try {
-                const keys  = await caches.keys();
-                const sizes = await Promise.all(keys.map(async k => {
-                    const c = await caches.open(k);
-                    const r = await c.keys();
-                    return r.length;
-                }));
-                const total = sizes.reduce((a,b)=>a+b,0);
-                cacheInfo = keys.length + ' cache(s), ' + total + ' entr' + (total===1?'y':'ies');
+                const keys = await caches.keys();
+                const counts = await Promise.all(keys.map(async k => (await (await caches.open(k)).keys()).length));
+                cacheInfo = `${keys.length} cache(s), ${counts.reduce((a,b)=>a+b,0)} entries`;
             } catch(_) {}
         }
-
         log(`<div class="pnl-head">PWA STATUS</div>
             <div class="stat-row"><span>Service Worker API</span><span style="color:${hasSW?'var(--success)':'var(--error)'}">${hasSW?'✓ Supported':'✗ Not available'}</span></div>
             <div class="stat-row"><span>SW Registered</span><span style="color:${swColor}">${swState}</span></div>
+            <div class="stat-row"><span>SW Script</span><span style="color:var(--accent)">${new URL('./sw.js', location.href).pathname}</span></div>
             <div class="stat-row"><span>Installed as App</span><span style="color:${isStandalone?'var(--success)':'var(--accent)'}">${isStandalone?'✓ Standalone':'Browser tab'}</span></div>
             <div class="stat-row"><span>Cache Storage</span><span style="color:var(--accent)">${cacheInfo}</span></div>
             <div class="stat-row"><span>Connection</span><span style="color:${navigator.onLine?'var(--success)':'var(--warn)'}">${navigator.onLine?'Online':'Offline'}</span></div>`);
     },
 
-    /* ── Trigger install prompt ─────────────────────────────────────── */
     async promptInstall() {
         if (this._deferredPrompt) {
             this._deferredPrompt.prompt();
             const { outcome } = await this._deferredPrompt.userChoice;
             this._deferredPrompt = null;
-            if (outcome === 'accepted') log('✓ Installing Ledgie…', 'success');
+            if (outcome === 'accepted') log('✓ Installing…', 'success');
             else log('Install dismissed.', 'system');
             return;
         }
-        const ua = navigator.userAgent;
-        if (/iPhone|iPad|iPod/.test(ua)) {
-            log('📱 iOS: Tap the <b>Share</b> button → <b>Add to Home Screen</b>', 'system');
-        } else if (/Android/.test(ua)) {
-            log('🤖 Android: Tap the browser menu → <b>Add to Home screen</b> or <b>Install app</b>', 'system');
-        } else {
-            log('🖥️ Desktop: Click the install icon (⊕) in your browser\'s address bar.', 'system');
-        }
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent))
+            log('📱 iOS: Share button → Add to Home Screen', 'system');
+        else if (/Android/.test(navigator.userAgent))
+            log('🤖 Android: Browser menu → Add to Home screen / Install app', 'system');
+        else
+            log('🖥️ Desktop: Install icon (⊕) in the address bar', 'system');
     },
 
-    /* ── Force SW update ────────────────────────────────────────────── */
     async update() {
-        const reg = this._reg || await navigator.serviceWorker.getRegistration().catch(()=>null);
+        const reg = this._reg || await navigator.serviceWorker.getRegistration(location.href).catch(()=>null);
         if (!reg) { log('No service worker registered.', 'warn'); return; }
         await reg.update();
-        log('✓ Update check triggered. Reload to apply if found.', 'success');
+        log('✓ Update check triggered.', 'success');
     }
 };
 
-// PwaManager.init() is called after all JS is defined (see end of script)
+// PwaManager.init() called after all JS defined (end of script)
 
 /* =========================================
    PERSISTENCE LAYER (HARDENED)
