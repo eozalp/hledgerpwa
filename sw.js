@@ -1,0 +1,5167 @@
+<!-- 
+================================================================================
+APPLICATION IDENTITY:
+  - Name: Ledgie v1.0 — Smart Personal Ledger
+  - Type: Single-File HTML5 PWA
+  - Architecture: Titanium Graph Engine V3.5
+
+SYSTEM ANALOGY (THE TITANIUM STARSHIP):
+  1. THE BRIDGE (Terminal UI): Helm (Input), Screen (Status), Log (Output).
+  2. CARGO HOLD (Persistence): LocalStorage & File System Docking.
+  3. NAV COMPUTER (GraphEngine): Visualizes data coordinates.
+  4. THE ORACLE (Prediction Engine): Context-aware cursor tracking.
+  5. THE VAULT (Strict Append Editor): 
+     - Split View: Read-Only History vs Active Entry.
+     - Enforces 4-space indent on postings.
+     - Auto-balancing suggestions.
+
+CHANGELOG V24.01:
+  1. REFACTOR: Editor is now "Append-Only".
+     - Old transactions are visible but locked (Read-Only).
+     - New transactions are typed in a dedicated strict constraint zone.
+  2. FEATURE: Indentation Enforcer.
+     - 'Enter' key auto-indents to 4 spaces after header.
+     - 'Backspace' is constrained to prevent breaking indentation.
+  3. UI: Split-pane editor layout.
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>Ledgie v11 — Smart Ledger</title>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- PWA manifest injected inline via JS below (single-file approach) -->
+
+    <style>
+        :root {
+            --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0;
+            --primary: #38bdf8; --accent: #64748b; --ghost: #475569;
+            --warn: #fbbf24; --error: #f87171; --success: #4ade80;
+            --font: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+            --font-size: 13px;
+        }
+        @media (max-width: 600px) { :root { --font-size: 14px; } }
+
+        [data-theme="matrix"] { --bg:#000; --panel:#0a0a0a; --text:#0f0; --primary:#0f0; --accent:#008f11; --ghost:#003300; --error:#f00; }
+        [data-theme="dracula"] { --bg:#282a36; --panel:#44475a; --text:#f8f8f2; --primary:#ff79c6; --accent:#6272a4; --ghost:#6272a4; }
+        [data-theme="paper"] { --bg:#fff; --panel:#f3f4f6; --text:#111; --primary:#000; --accent:#9ca3af; --ghost:#d1d5db; }
+        [data-theme="solarized"] { --bg:#002b36; --panel:#073642; --text:#839496; --primary:#268bd2; --accent:#586e75; --ghost:#3a5361; --success:#859900; --warn:#b58900; --error:#dc322f; }
+        [data-theme="catppuccin"] { --bg:#1e1e2e; --panel:#313244; --text:#cdd6f4; --primary:#89b4fa; --accent:#6c7086; --ghost:#45475a; --success:#a6e3a1; --warn:#f9e2af; --error:#f38ba8; }
+        [data-theme="nord"] { --bg:#2e3440; --panel:#3b4252; --text:#eceff4; --primary:#88c0d0; --accent:#4c566a; --ghost:#434c5e; --success:#a3be8c; --warn:#ebcb8b; --error:#bf616a; }
+        [data-theme="monokai"] { --bg:#272822; --panel:#3e3d32; --text:#f8f8f2; --primary:#a6e22e; --accent:#75715e; --ghost:#49483e; --success:#a6e22e; --warn:#e6db74; --error:#f92672; }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html { height: 100%; overscroll-behavior: none; }
+        body { 
+            margin: 0; background: var(--bg); color: var(--text); 
+            font-family: var(--font); position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; overflow: hidden; 
+        }
+
+        #status-bar { 
+            padding: 12px 1rem; font-size: 11px; 
+            background: var(--panel); color: var(--accent); 
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--accent); flex-shrink: 0; 
+            padding-top: max(12px, env(safe-area-inset-top));
+        }
+        #status-right { display: flex; gap: 10px; align-items: center; }
+        #strict-badge { color: var(--warn); display: none; font-weight: bold; border: 1px solid var(--warn); padding: 0 4px; border-radius: 3px; }
+        #mount-badge { display: none; font-weight: bold; background: var(--primary); color: var(--bg); padding: 0 4px; border-radius: 3px; cursor: pointer; user-select: none; }
+        #pwa-badge { display: none; font-weight: bold; background: var(--success); color: var(--bg); padding: 0 4px; border-radius: 3px; }
+        #ledger-badge { text-transform: uppercase; letter-spacing: 1px; }
+
+        #terminal-container { 
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; 
+            scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+        }
+        #terminal-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; padding-bottom: 20px; }
+        
+        .line { margin-bottom: 8px; word-break: break-word; font-size: var(--font-size); line-height: 1.5; }
+        .line.cmd { color: var(--accent); margin-top: 1.5rem; padding-top: 0.5rem; border-top: 1px solid var(--panel); opacity: 0.8; }
+        .line.cmd::before { content: "➜ "; color: var(--primary); }
+        .line.system { color: var(--accent); font-style: italic; }
+        .line.error { color: var(--error); }
+        .line.success { color: var(--success); }
+        .line.warn { color: var(--warn); }
+        .line.dismissible { background: rgba(251, 191, 36, 0.1); padding: 8px; border-left: 2px solid var(--warn); border-radius: 0 4px 4px 0; display: flex; justify-content: space-between; align-items: center; }
+        .dismiss-btn { cursor: pointer; text-decoration: underline; font-weight: bold; font-size: 0.9em; opacity: 0.8; margin-left: 10px; white-space: nowrap; }
+        .dismiss-btn:hover { opacity: 1; }
+
+        .help-cat { color: var(--primary); font-weight: bold; margin-top: 12px; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--panel); padding-bottom: 2px; }
+        .help-cmd { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+        .help-cmd span:first-child { color: var(--text); font-weight: 500; }
+        .help-cmd span:last-child { color: var(--accent); opacity: 0.8; font-size: 12px; }
+
+        /* GRAPH & TOOLTIP STYLES */
+        .graph-container { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 12px; margin: 12px 0; position: relative; user-select: none; overflow: hidden; }
+        .graph-container:hover { border-color: var(--primary); transition: border-color 0.2s; }
+        .graph-header { font-size: 11px; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; align-items: center; }
+        .graph-legend { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+        .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+        
+        svg { overflow: visible; }
+        svg text { fill: var(--accent); font-size: 10px; font-family: var(--font); }
+        svg .grid-line { stroke: var(--ghost); stroke-opacity: 0.2; stroke-dasharray: 4; }
+        svg .chart-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+        svg .chart-area { stroke: none; fill-opacity: 0.25; }
+        svg .trend-line { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4; opacity: 0.8; }
+        
+        svg .crosshair { stroke: var(--text); stroke-width: 1; stroke-dasharray: 2; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+        svg .hover-dot { stroke-width: 2; opacity: 0; pointer-events: none; transition: opacity 0.1s; fill: var(--bg); stroke: var(--primary); }
+        
+        #graph-tooltip {
+            position: fixed; pointer-events: none; background: rgba(15, 23, 42, 0.97);
+            border: 1px solid var(--primary); color: var(--text); padding: 8px 10px;
+            border-radius: 8px; font-size: 11px; z-index: 9999; opacity: 0;
+            transition: opacity 0.1s; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            backdrop-filter: blur(6px); min-width: 130px; left: 0; top: 0;
+        }
+        #graph-tooltip .tt-head { border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 4px; padding-bottom: 4px; font-weight: bold; color: var(--primary); }
+        #graph-tooltip .tt-row { display: flex; justify-content: space-between; margin-bottom: 2px; gap: 15px; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 10px; }
+        .data-table th { text-align: left; border-bottom: 1px solid var(--accent); color: var(--accent); font-weight: normal; padding: 6px 4px; font-size: 0.8em; text-transform: uppercase; }
+        .data-table td { padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table .num { text-align: right; font-family: var(--font); }
+        
+        /* INPUT AREA */
+        #input-wrapper { background: var(--panel); padding: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 999; border-top: 1px solid var(--accent); flex-shrink: 0; }
+        #suggestions-container { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; height: 34px; }
+        #context-badge { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); padding: 0 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: bold; min-width: 50px; text-align: center; height: 32px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        #context-badge:active { background: var(--accent); color: var(--bg); }
+        
+        #suggestions { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; height: 100%; align-items: center; -webkit-overflow-scrolling: touch; }
+        
+        .chip { background: var(--bg); color: var(--text); padding: 0 10px; border-radius: 6px; font-size: 13px; white-space: nowrap; border: 1px solid var(--accent); cursor: pointer; opacity: 0.9; text-transform: none; transition: background 0.2s; height: 32px; display: flex; align-items: center; user-select: none; gap: 6px; }
+        .chip:active { background: var(--primary); color: var(--bg); }
+        .chip.hint { border: 1px dashed var(--accent); opacity: 0.8; font-style: italic; }
+        .chip.math { border: 1px solid var(--success); color: var(--success); font-weight: bold; background: rgba(74, 222, 128, 0.1); }
+        .chip.priority { border: 1px solid var(--warn); color: var(--warn); background: rgba(251, 191, 36, 0.1); font-weight: bold; }
+        .chip i { font-style: normal; opacity: 0.5; font-size: 10px; text-transform: uppercase; }
+        
+        .chip.best-match { background: rgba(56, 189, 248, 0.15); border-color: var(--primary); font-weight: bold; }
+        .chip-label { font-size: 9px; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; background: var(--panel); border: 1px solid var(--accent); color: var(--accent); }
+        .chip.best-match .chip-label { background: var(--primary); color: var(--bg); border: none; }
+        .chip.math .chip-label { background: var(--success); color: var(--bg); border: none; }
+
+        .input-stack { position: relative; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 0 8px 0 12px; height: 48px; }
+        .prompt { color: var(--primary); font-weight: bold; margin-right: 8px; white-space: pre; font-size: 16px; }
+        body.confirm-mode .prompt { color: var(--warn); }
+        #cmd-input, #ghost-text { font-family: var(--font); font-size: 16px; position: absolute; left: 30px; right: 50px; top: 0; bottom: 0; background: transparent; border: none; outline: none; display: flex; align-items: center; padding: 0; margin: 0; text-transform: none; }
+        #cmd-input { z-index: 2; color: var(--text); width: calc(100% - 80px); }
+        #ghost-text { z-index: 1; color: var(--ghost); pointer-events: none; white-space: pre; overflow: hidden; opacity: 0.5; }
+        #tab-btn { position: absolute; right: 4px; z-index: 10; background: var(--panel); color: var(--primary); border: 1px solid var(--accent); border-radius: 6px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; font-size: 18px; }
+        #tab-btn.visible { opacity: 1; pointer-events: auto; }
+
+        /* EDITOR STYLES - STRICT SPLIT VIEW */
+        #editor-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
+        #editor-modal.open { transform: translateY(0); }
+
+        #editor-toolbar { padding: 1rem; background: var(--panel); border-bottom: 1px solid var(--accent); display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: max(1rem, env(safe-area-inset-top)); flex-shrink: 0; }
+
+        #editor-workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+        /* Read Only History Layer */
+        #editor-history { 
+            flex: 1; 
+            background: var(--bg); 
+            color: var(--ghost); 
+            font-family: var(--font); 
+            font-size: 14px; 
+            padding: 1rem; 
+            white-space: pre; 
+            overflow-y: auto; 
+            border-bottom: 1px dashed var(--accent);
+            opacity: 0.7;
+            user-select: text;
+        }
+
+        /* Active Entry Layer */
+        #active-entry-container { 
+            height: auto; 
+            min-height: 150px; 
+            max-height: 40vh;
+            background: var(--panel); 
+            padding: 1rem; 
+            display: flex; 
+            flex-direction: column;
+            border-top: 1px solid var(--primary);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+        }
+
+        #active-editor { 
+            width: 100%; 
+            height: 100%; 
+            background: transparent; 
+            color: var(--text); 
+            border: none; 
+            font-family: var(--font); 
+            font-size: 14px; 
+            resize: none; 
+            outline: none; 
+            white-space: pre; 
+            overflow-x: auto;
+            line-height: 1.5; 
+            tab-size: 4; 
+            caret-color: var(--primary);
+        }
+        
+        #editor-suggestions { 
+            height: 48px; background: var(--bg); display: flex; gap: 8px; align-items: center; padding: 0 10px; 
+            overflow-x: auto; border-top: 1px solid var(--accent); padding-bottom: max(5px, env(safe-area-inset-bottom));
+            flex-shrink: 0;
+        }
+
+        .lint-err { color: var(--error); margin-bottom: 4px; font-family: var(--font); }
+
+        .toolbar-group { display: flex; gap: 5px; align-items: center; }
+        .editor-search { background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 4px 8px; border-radius: 4px; width: 100px; font-size: 12px; }
+        .editor-search:focus { width: 140px; border-color: var(--primary); outline: none; transition: width 0.2s; }
+        
+        .btn { padding: 8px 12px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+        .btn-primary { background: var(--primary); color: var(--bg); }
+        .btn-secondary { background: var(--ghost); color: var(--text); opacity: 0.8; }
+        .btn-text { background: transparent; color: var(--error); }
+        .btn-icon { padding: 8px; }
+
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .dash-card { background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--accent); display: flex; flex-direction: column; }
+        .dash-label { font-size: 11px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+        .dash-val { font-size: 18px; font-weight: bold; color: var(--text); }
+
+        /* TOAST */
+        #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--panel); color: var(--text); padding: 8px 16px; border-radius: 20px; font-size: 12px; border: 1px solid var(--accent); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 9000; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        .pnl-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--panel); }
+        .pnl-head { font-weight: bold; color: var(--primary); margin-top: 12px; border-bottom: 1px solid var(--accent); padding-bottom: 4px; }
+        .pnl-total { font-weight: bold; border-top: 1px solid var(--text); margin-top: 6px; padding-top: 6px; color: var(--text); }
+        
+        .tree-node { color: var(--primary); font-weight: bold; cursor: default; padding: 1px 0; }
+        .tree-leaf  { color: var(--text); opacity: 0.8; padding: 1px 0; }
+        
+        .stat-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed var(--panel); font-size: 0.95em; }
+        
+        .budget-row { margin-bottom: 10px; }
+        .budget-label { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.8; margin-bottom: 4px; }
+        .budget-track { height: 10px; background: var(--panel); border-radius: 5px; overflow: hidden; }
+        .budget-fill { height: 100%; background: var(--success); transition: width 0.3s; }
+        .budget-fill.warn { background: var(--warn); }
+        .budget-fill.over { background: var(--error); }
+        
+        #editor-status { font-size: 10px; color: var(--warn); margin-left: 10px; text-transform: uppercase; transition: color 0.2s; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+        #editor-status.shake { animation: shake 0.35s ease; }
+
+        /* KEYBOARD SHORTCUTS OVERLAY */
+        #keys-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(4px); }
+        #keys-modal.open { opacity: 1; pointer-events: auto; }
+        #keys-panel { background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 20px; max-width: 480px; width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+        #keys-panel h2 { margin: 0 0 16px; font-size: 13px; color: var(--primary); letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid var(--accent); padding-bottom: 8px; }
+        .keys-section { margin-bottom: 14px; }
+        .keys-section-title { font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .key-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; }
+        .key-row span:first-child { color: var(--text); }
+        .key-row span:last-child { color: var(--accent); }
+        kbd { background: var(--bg); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; font-family: var(--font); font-size: 11px; color: var(--primary); }
+
+        /* SEARCH HIGHLIGHT */
+        .search-highlight { background: rgba(251,191,36,0.3); color: var(--warn); border-radius: 2px; padding: 0 1px; font-weight: bold; }
+        .search-result-row { display: flex; flex-direction: column; padding: 6px 0; border-bottom: 1px solid var(--panel); }
+        .search-result-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+        .search-result-date { color: var(--accent); }
+        .search-result-desc { color: var(--text); font-weight: bold; }
+        .search-result-post { font-size: 11px; color: var(--ghost); padding-left: 8px; }
+        .search-count { color: var(--accent); font-size: 11px; margin-bottom: 6px; }
+
+        /* SPARKLINE */
+        .sparkline-wrap { display: inline-flex; align-items: flex-end; gap: 1px; height: 20px; vertical-align: middle; margin-left: 6px; }
+        .spark-bar { width: 3px; background: var(--primary); border-radius: 1px 1px 0 0; opacity: 0.7; }
+        .spark-bar.neg { background: var(--error); }
+
+        /* TREND DISPLAY */
+        .trend-card { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin: 4px 0; }
+        .trend-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; }
+        .trend-pct { font-weight: bold; }
+        .trend-up { color: var(--error); }
+        .trend-dn { color: var(--success); }
+        .trend-flat { color: var(--accent); }
+
+        /* RECENT TRANSACTIONS */
+        .recent-txn { border-left: 2px solid var(--accent); padding: 6px 0 6px 10px; margin-bottom: 8px; }
+        .recent-txn.debit { border-left-color: var(--error); }
+        .recent-txn.credit { border-left-color: var(--success); }
+        .recent-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--accent); margin-bottom: 2px; }
+        .recent-desc { font-size: 13px; color: var(--text); font-weight: 500; }
+        .recent-amount { font-size: 13px; font-weight: bold; }
+
+        /* SYNTAX HIGHLIGHTING IN HISTORY */
+        .hl-date { color: var(--primary); }
+        .hl-account { color: var(--text); }
+        .hl-amount { color: var(--success); }
+        .hl-amount.neg { color: var(--error); }
+        .hl-comment { color: var(--ghost); font-style: italic; }
+        .hl-directive { color: var(--warn); }
+        #editor-history { white-space: pre; overflow-x: auto; }
+
+        /* FORECAST */
+        .forecast-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed var(--panel); }
+        .forecast-date { color: var(--accent); min-width: 80px; }
+        .forecast-desc { color: var(--text); flex: 1; padding: 0 8px; }
+        .forecast-amt { font-weight: bold; }
+
+        /* GRAPH STATS PANEL */
+        .graph-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+        @media (max-width: 400px) { .graph-stats { grid-template-columns: repeat(2, 1fr); } }
+        .graph-stat { background: var(--bg); border: 1px solid var(--ghost); border-radius: 5px; padding: 5px 8px; text-align: center; }
+        .graph-stat-label { font-size: 9px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }
+        .graph-stat-val { font-size: 13px; font-weight: bold; color: var(--text); margin-top: 2px; }
+        .graph-type-tabs { display: flex; gap: 4px; }
+        .graph-tab { font-size: 10px; padding: 2px 7px; border-radius: 4px; cursor: pointer; border: 1px solid var(--accent); color: var(--accent); background: transparent; font-family: var(--font); transition: all 0.15s; }
+        .graph-tab:hover, .graph-tab.active { background: var(--primary); color: var(--bg); border-color: var(--primary); }
+        svg .zero-line { stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.6; }
+        svg .axis-line { stroke: var(--accent); stroke-opacity: 0.3; }
+        svg .x-label { fill: var(--ghost); font-size: 9px; }
+        svg .annotation { fill: var(--warn); font-size: 9px; }
+        svg .hover-dot { transition: r 0.08s, opacity 0.1s; }
+
+        /* COA EDITOR MODAL */
+        #coa-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 2500; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s cubic-bezier(.4,0,.2,1); }
+        #coa-modal.open { transform: translateY(0); }
+
+        #coa-toolbar {
+            padding: 0 1rem;
+            height: 56px;
+            background: var(--panel);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex; align-items: center; gap: 10px;
+            padding-top: max(0px, env(safe-area-inset-top));
+            flex-shrink: 0;
+        }
+        #coa-toolbar-title { font-size: 13px; font-weight: bold; color: var(--text); letter-spacing: 0.5px; flex: 1; }
+        #coa-toolbar-title span { color: var(--primary); }
+        #coa-search {
+            background: var(--bg); border: 1px solid var(--accent); color: var(--text);
+            padding: 5px 10px; border-radius: 6px; font-family: var(--font); font-size: 12px;
+            outline: none; width: 130px; transition: border-color 0.15s, width 0.2s;
+        }
+        #coa-search:focus { border-color: var(--primary); width: 170px; }
+        #coa-toolbar .btn { font-size: 11px; padding: 5px 10px; white-space: nowrap; }
+
+        #coa-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        #coa-tabs {
+            display: flex; border-bottom: 1px solid rgba(255,255,255,0.07);
+            background: var(--panel); flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+            padding: 0 1rem; gap: 0;
+        }
+        .coa-tab {
+            padding: 8px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--accent); cursor: pointer; border-bottom: 2px solid transparent;
+            white-space: nowrap; transition: color 0.15s, border-color 0.15s;
+            user-select: none;
+        }
+        .coa-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: bold; }
+        .coa-tab:hover:not(.active) { color: var(--text); }
+        .coa-tab-badge { 
+            display: inline-block; background: var(--bg); color: var(--ghost);
+            border-radius: 10px; padding: 0 5px; font-size: 9px; margin-left: 4px; 
+            vertical-align: middle;
+        }
+        .coa-tab.active .coa-tab-badge { background: rgba(56,189,248,0.15); color: var(--primary); }
+
+        #coa-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* ---- ACCOUNT TABLE ---- */
+        .coa-section { margin-bottom: 2px; }
+        .coa-section-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 1rem; background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            position: sticky; top: 0; z-index: 5;
+        }
+        .coa-section-icon { font-size: 14px; }
+        .coa-section-name { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); flex: 1; }
+        .coa-section-bal { font-size: 12px; font-family: var(--font); font-weight: bold; }
+        .coa-section-add { font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px dashed var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-family: var(--font); transition: all 0.15s; white-space: nowrap; }
+        .coa-section-add:hover { border-color: var(--success); color: var(--success); border-style: solid; }
+        .coa-empty { padding: 10px 1rem 10px 1.5rem; font-size: 11px; color: var(--ghost); font-style: italic; }
+
+        /* Each account row */
+        .coa-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            align-items: center;
+            gap: 0;
+            padding: 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            min-height: 40px;
+        }
+        .coa-row:hover { background: rgba(255,255,255,0.025); }
+        .coa-row.editing { background: rgba(56,189,248,0.06); }
+
+        .coa-row-indent { display: flex; align-items: stretch; flex-shrink: 0; }
+        .coa-tree-guide { width: 20px; border-right: 1px dashed rgba(255,255,255,0.1); flex-shrink: 0; }
+        .coa-tree-elbow { width: 20px; position: relative; flex-shrink: 0; }
+        .coa-tree-elbow::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; bottom: 50%;
+            border-left: 1px dashed rgba(255,255,255,0.1);
+        }
+        .coa-tree-elbow::after {
+            content: ''; position: absolute;
+            top: 50%; left: 0; right: 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.1);
+        }
+
+        .coa-row-main { display: flex; flex-direction: column; justify-content: center; padding: 6px 8px 6px 6px; min-width: 0; cursor: pointer; }
+        .coa-row-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.1s; }
+        .coa-row:hover .coa-row-name { color: var(--primary); }
+        .coa-row-path { font-size: 10px; color: var(--ghost); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+        .coa-row-bal { font-size: 12px; font-family: var(--font); padding: 0 10px; white-space: nowrap; text-align: right; min-width: 70px; }
+        .coa-row-actions { display: flex; align-items: center; gap: 4px; padding: 0 8px 0 4px; flex-shrink: 0; }
+
+        .coa-act { 
+            width: 26px; height: 26px; border-radius: 5px; border: 1px solid transparent;
+            background: transparent; color: var(--ghost); cursor: pointer; font-size: 13px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; font-family: var(--font);
+        }
+        .coa-act:hover { background: rgba(255,255,255,0.07); color: var(--text); border-color: var(--accent); }
+        .coa-act.add:hover { color: var(--success); border-color: var(--success); }
+        .coa-act.del:hover { color: var(--error); border-color: var(--error); }
+        .coa-act.reg:hover { color: var(--primary); border-color: var(--primary); }
+        .coa-txn-count { font-size: 9px; color: var(--ghost); padding: 1px 4px; border-radius: 3px; background: var(--panel); min-width: 16px; text-align: center; }
+
+        /* Inline edit panel — appears below the row, full width */
+        .coa-edit-panel {
+            background: rgba(56,189,248,0.06);
+            border-bottom: 1px solid rgba(56,189,248,0.2);
+            border-top: 1px solid rgba(56,189,248,0.1);
+            padding: 10px 1rem;
+        }
+        .coa-edit-panel-label { font-size: 10px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .coa-edit-panel-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .coa-edit-prefix { font-size: 12px; color: var(--accent); font-family: var(--font); white-space: nowrap; }
+        .coa-input { 
+            background: var(--bg); border: 1px solid var(--primary); color: var(--text);
+            padding: 6px 10px; border-radius: 6px; font-family: var(--font); font-size: 13px;
+            outline: none; min-width: 140px; flex: 1; transition: border-color 0.15s;
+        }
+        .coa-input:focus { border-color: var(--text); }
+        .coa-input.error { border-color: var(--error); }
+        .coa-edit-warn { font-size: 10px; color: var(--warn); white-space: nowrap; }
+        .coa-edit-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+        .coa-footer { padding: 10px 1rem; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: var(--ghost); line-height: 1.6; flex-shrink: 0; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="status-bar">
+    <span>LEDGIE <span style="color:var(--ghost);font-size:10px">v11</span></span>
+    <div id="status-right">
+        <span id="pwa-badge">OFFLINE READY</span>
+        <span id="mount-badge" onclick="run('stats')" title="Click for stats">MOUNTED</span>
+        <span id="strict-badge">STRICT</span>
+        <span id="ledger-badge">default</span>
+    </div>
+</div>
+
+<div id="terminal-container" ondblclick="input.blur()">
+    <div id="terminal-content">
+        <div class="line system">Ledgie v11 — smart personal ledger. Graph Engine online. Type <span style="color:var(--primary);cursor:pointer" onclick="run('help')">help</span> · <span style="color:var(--primary);cursor:pointer" onclick="toggleKeys()">?</span> for shortcuts · <span style="color:var(--primary);cursor:pointer" onclick="run('tutorial')">tutorial</span> to learn</div>
+        <div class="line system">Quick: <span style="color:var(--primary);cursor:pointer" onclick="run('recent')">recent</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('dash')">dash</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('add')">add</span> · <span style="color:var(--primary);cursor:pointer" onclick="run('backup')">backup</span> · press <kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">d</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">r</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">b</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">n</kbd><kbd style="background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-size:10px;color:var(--primary)">p</kbd> for quick views</div>
+    </div>
+</div>
+
+<div id="input-wrapper">
+    <div id="suggestions-container">
+        <div id="context-badge" onmousedown="event.preventDefault()" onclick="cycleContext()" title="Cycle suggestion context filter">ALL</div>
+        <div id="suggestions"></div>
+    </div>
+    <div class="input-stack">
+        <span class="prompt" id="prompt-char">$</span>
+        <div id="ghost-text"></div>
+        <input type="text" id="cmd-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div id="tab-btn" onmousedown="event.preventDefault()" onclick="acceptGhost()">➜</div>
+    </div>
+</div>
+
+<div id="graph-tooltip"></div>
+<div id="toast"></div>
+<input type="file" id="file-input" style="display:none">
+
+<!-- KEYBOARD SHORTCUTS OVERLAY -->
+<div id="keys-modal" onclick="if(event.target===this)toggleKeys()">
+    <div id="keys-panel">
+        <h2>⌨ Quick Reference</h2>
+        <div class="keys-section">
+            <div class="keys-section-title">Terminal</div>
+            <div class="key-row"><span>Cycle history up/down</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+            <div class="key-row"><span>Accept autocomplete</span><span><kbd>Tab</kbd> or <kbd>→</kbd></span></div>
+            <div class="key-row"><span>Clear screen</span><span><kbd>Ctrl</kbd>+<kbd>L</kbd></span></div>
+            <div class="key-row"><span>This help</span><span><kbd>?</kbd></span></div>
+            <div class="key-row"><span>Dashboard (empty input)</span><span><kbd>d</kbd></span></div>
+            <div class="key-row"><span>Recent (empty input)</span><span><kbd>r</kbd></span></div>
+            <div class="key-row"><span>Balances (empty input)</span><span><kbd>b</kbd></span></div>
+            <div class="key-row"><span>New transaction (empty input)</span><span><kbd>n</kbd></span></div>
+            <div class="key-row"><span>P&amp;L statement (empty input)</span><span><kbd>p</kbd></span></div>
+            <div class="key-row"><span>Waterfall (empty input)</span><span><kbd>w</kbd></span></div>
+        </div>
+        <div class="keys-section">
+            <div class="keys-section-title">Commands</div>
+            <div class="key-row"><span>Dashboard</span><span><code>dash</code></span></div>
+            <div class="key-row"><span>Net worth</span><span><code>net</code></span></div>
+            <div class="key-row"><span>Recent transactions</span><span><code>recent [N]</code></span></div>
+            <div class="key-row"><span>Balance sheet</span><span><code>bal [filter]</code></span></div>
+            <div class="key-row"><span>Register</span><span><code>reg [filter]</code></span></div>
+            <div class="key-row"><span>P&amp;L statement</span><span><code>pnl [filter]</code></span></div>
+            <div class="key-row"><span>Profit waterfall</span><span><code>waterfall [filter]</code></span></div>
+            <div class="key-row"><span>Accounts + balances</span><span><code>accounts</code></span></div>
+            <div class="key-row"><span>Tag list</span><span><code>tags</code></span></div>
+            <div class="key-row"><span>Search transactions</span><span><code>search &lt;text&gt;</code></span></div>
+            <div class="key-row"><span>Trend analysis</span><span><code>trend [account]</code></span></div>
+            <div class="key-row"><span>Spending forecast</span><span><code>forecast [days]</code></span></div>
+            <div class="key-row"><span>Chart of accounts (editor)</span><span><code>coa</code></span></div>
+            <div class="key-row"><span>Graph (line/area/bar/donut)</span><span><code>graph [type:X] [by:Y]</code></span></div>
+            <div class="key-row"><span>Integrity check</span><span><code>check</code></span></div>
+        </div>
+        <div class="keys-section">
+            <div class="keys-section-title">Entry</div>
+            <div class="key-row"><span>Smart editor</span><span><code>add</code></span></div>
+            <div class="key-row"><span>Buy stock/commodity</span><span><code>buy 80 AAPL with 9000 TRY</code></span></div>
+            <div class="key-row"><span>Register commodity</span><span><code>commodity TRY</code></span></div>
+            <div class="key-row"><span>Repeat last match</span><span><code>recur &lt;desc&gt;</code></span></div>
+            <div class="key-row"><span>Undo last entry</span><span><code>undo</code></span></div>
+            <div class="key-row"><span>Delete by index</span><span><code>rm &lt;id&gt;</code></span></div>
+        </div>
+        <div class="keys-section">
+            <div class="keys-section-title">Data</div>
+            <div class="key-row"><span>Mount file (picker)</span><span><code>mount</code></span></div>
+            <div class="key-row"><span>Re-link saved file</span><span><code>remount</code></span></div>
+            <div class="key-row"><span>Disconnect file</span><span><code>unmount</code></span></div>
+            <div class="key-row"><span>Export file</span><span><code>export</code></span></div>
+            <div class="key-row"><span>Export CSV</span><span><code>export csv</code></span></div>
+            <div class="key-row"><span>Export JSON</span><span><code>export json</code></span></div>
+            <div class="key-row"><span>Copy to clipboard</span><span><code>export copy</code></span></div>
+            <div class="key-row"><span>Manual backup</span><span><code>backup now</code></span></div>
+            <div class="key-row"><span>View backups</span><span><code>backup list</code></span></div>
+        </div>
+        <div style="text-align:center;margin-top:12px"><button class="btn btn-secondary" onclick="toggleKeys()">Close</button></div>
+    </div>
+</div>
+
+<div id="editor-modal">
+    <div id="editor-toolbar">
+        <div class="toolbar-group">
+            <button class="btn btn-text" onclick="Editor.close()">Close</button>
+        </div>
+        <div class="toolbar-group">
+            <span id="editor-status">IDLE</span>
+            <button class="btn btn-primary" onclick="Editor.save()">ADD TRANSACTION</button>
+        </div>
+    </div>
+    
+    <div id="editor-workspace">
+        <!-- Old transactions (Read Only) -->
+        <div id="editor-history"></div>
+        
+        <!-- New Transaction (Strict Input) -->
+        <div id="active-entry-container">
+            <div style="font-size:10px; color:var(--primary); margin-bottom:5px; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">New Entry</div>
+            <textarea id="active-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        </div>
+    </div>
+
+    <div id="editor-suggestions"></div>
+</div>
+
+<!-- COA BATCH EDITOR MODAL -->
+<div id="coa-modal">
+    <div id="coa-toolbar">
+        <button class="btn btn-text" onclick="COAEditor.close()" style="padding:5px 8px;color:var(--accent)">✕</button>
+        <div id="coa-toolbar-title"><span>Ledgie</span> · Accounts</div>
+        <input type="text" id="coa-search" placeholder="🔍 Filter…" oninput="COAEditor.filter(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="btn btn-primary" onclick="COAEditor.addRootPrompt()" style="font-size:11px;padding:5px 10px">+ New</button>
+    </div>
+    <div id="coa-body">
+        <div id="coa-tabs"></div>
+        <div id="coa-content">
+            <div id="coa-tree"></div>
+        </div>
+    </div>
+    <div class="coa-footer">
+        <b style="color:var(--accent)">Tap</b> an account to rename · <b style="color:var(--accent)">+</b> adds a child · accounts with transactions show their register · balances are direct only
+    </div>
+</div>
+
+<script>
+/* =========================================
+   CORE UTILS
+   ========================================= */
+// FIXED: Always produce 2 decimal places for ledger compliance
+const fmtNum = (n) => {
+    if (n === null || n === undefined || isNaN(n)) return '0.00';
+    // Use Decimal-safe rounding to avoid floating point drift
+    const factor = 100;
+    const r = Math.round((n + Number.EPSILON) * factor) / factor;
+    // Fix -0.00 display
+    const s = r.toFixed(2);
+    return s === '-0.00' ? '0.00' : s;
+};
+
+// Format number with optional commodity symbol
+const fmtAmt = (val, comm, pos) => {
+    if (!comm) return fmtNum(val);
+    return pos === 'left' ? `${comm}${fmtNum(val)}` : `${fmtNum(val)} ${comm}`;
+};
+
+// Pad string to fixed width (right-align numbers, left-align labels)
+const padLeft = (s, w) => String(s).padStart(w);
+const padRight = (s, w) => String(s).padEnd(w);
+
+const escapeHtml = (unsafe) => String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
+/* =========================================
+   UNICODE-SAFE ACCOUNT NAME HELPERS
+   \w in JS is ASCII-only ([A-Za-z0-9_]).  Turkish (and any other Unicode)
+   account names like "giderler:yiyecek" break silently.
+   Solution: use \p{L} (Unicode letter) + \p{N} (Unicode number) with the
+   /u flag, plus the punctuation that hledger allows in account names.
+   ========================================= */
+
+// Character class string for account-name characters (no brackets/virtual markers)
+// Allows: Unicode letters, digits, hyphen, underscore, quote, colon, dot
+const _AC = '[\\p{L}\\p{N}_\'":.-]';
+// Full account segment: may be wrapped in () or [] for virtual postings
+const _ACV = `(?:[([\\]]?${_AC}+[():[\\]"\\-${_AC.slice(1,-1)}]*)+`;
+
+// Pre-compiled regexes for the most common patterns (all use /u flag)
+const ACC_RE = {
+    // One full account name (no brackets), e.g.  assets:bank:checking
+    name:       new RegExp(`^${_AC}+(?::${_AC}+)*$`, 'u'),
+    // Account name possibly with virtual markers, consuming one "word" up to double-space
+    posting:    new RegExp(`^(\\s+)(${_ACV})(?:\\s{2,}(.*))?$`, 'u'),
+    // Posting line detection: indented line starting with a Unicode letter or virtual bracket
+    isPosting:  /^[ \t]+[\p{L}\p{N}_(["[]/u,
+    // Extract account from indented line (no amount yet): 4-space indent + account, trailing spaces only
+    postingOnly: new RegExp(`^(\\s{4})(${_ACV})\\s*$`, 'u'),
+    // Account + double-space gap + rest (for cursor positioning)
+    withGap:    new RegExp(`^(\\s+)(${_ACV})(\\s{2,})(.*)$`, 'u'),
+    // "Has double-space gap anywhere after indent+account" test
+    hasGap:     /^[ \t]+[\p{L}\p{N}_(["[].*?  /u,
+    // First word on a posting line (after indent)
+    firstWord:  new RegExp(`^\\s*(${_ACV})`, 'u'),
+};
+
+// Extract the account name from a posting line (strips indent, stops at double-space)
+function accFromLine(line) {
+    const m = line.match(ACC_RE.posting);
+    return m ? m[2].trim() : null;
+}
+
+// Check if a line is a posting line (indented, not a comment)
+function isPostingLine(line) {
+    return ACC_RE.isPosting.test(line) && !/^\s+[;#%]/.test(line);
+}
+
+// Given a posting line, return the character index where the account name ends
+// (i.e. the position where double-space should be inserted for amount entry)
+function accountEndIdx(line) {
+    const m = line.match(new RegExp(`^(\\s+${_ACV})`, 'u'));
+    return m ? m[1].length : line.search(/\S/) + line.trimStart().length;
+}
+
+
+
+const MathEngine = {
+    eval(str) {
+        if (!str || /^\d{4}-\d{1,2}/.test(str) || /^[\d.\s]+$/.test(str)) return null; 
+        if (!/[\+\-\*\/]/.test(str)) return null;
+        // Only allow safe math characters (no function calls, no variables)
+        if (!/^[\[\d\.\+\-\*\/\(\)\s%]+$/.test(str)) return null;
+        // Prevent division by zero
+        if (/\/\s*0(?![.\d])/.test(str)) return null;
+        try { 
+            const res = new Function('return (' + str.replace(/%/g, '/100*') + ')')(); 
+            if (isFinite(res) && !isNaN(res)) return fmtNum(res); 
+        } catch(e) {} 
+        return null;
+    },
+    linearRegression(data) {
+        const n = data.length; if (n < 2) return null;
+        let sumX=0, sumY=0, sumXY=0, sumXX=0;
+        for (let i=0; i<n; i++) { sumX += i; sumY += data[i].y; sumXY += (i*data[i].y); sumXX += (i*i); }
+        const denom = (n * sumXX - sumX * sumX);
+        if (Math.abs(denom) < 1e-10) return null; // avoid divide by zero
+        const slope = (n * sumXY - sumX * sumY) / denom;
+        const intercept = (sumY - slope * sumX) / n;
+        return data.map((d, i) => ({ x: d.x, y: slope * i + intercept }));
+    },
+    // Standard deviation for statistical analysis
+    stdDev(arr) {
+        if (arr.length < 2) return 0;
+        const mean = arr.reduce((a,b) => a+b, 0) / arr.length;
+        const sq = arr.map(x => Math.pow(x - mean, 2));
+        return Math.sqrt(sq.reduce((a,b) => a+b, 0) / arr.length);
+    }
+};
+
+/* =========================================
+   ADVANCED QUERY ENGINE
+   ========================================= */
+function getDateRange(dVal) {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    if (dVal === 'today') return { prefix: now.toISOString().slice(0, 10) };
+    if (dVal === 'yesterday') { const y2 = new Date(y,m,d-1); return { prefix: y2.toISOString().slice(0,10) }; }
+    if (dVal === 'thisweek') {
+        const dow = now.getDay(); const mon = new Date(y,m,d - (dow===0?6:dow-1));
+        return { from: mon.toISOString().slice(0,10), to: now.toISOString().slice(0,10) };
+    }
+    if (dVal === 'lastweek') {
+        const dow = now.getDay(); const mon = new Date(y,m,d - (dow===0?6:dow-1) - 7);
+        const sun = new Date(mon.getTime() + 6*86400000);
+        return { from: mon.toISOString().slice(0,10), to: sun.toISOString().slice(0,10) };
+    }
+    if (dVal === 'thismonth') return { prefix: now.toISOString().slice(0, 7) };
+    if (dVal === 'lastmonth') { const lm = new Date(y, m-1, 1); return { prefix: lm.toISOString().slice(0,7) }; }
+    if (dVal === 'thisyear') return { prefix: String(y) };
+    if (dVal === 'lastyear') return { prefix: String(y-1) };
+    if (dVal === 'q1') return { from: `${y}-01-01`, to: `${y}-03-31` };
+    if (dVal === 'q2') return { from: `${y}-04-01`, to: `${y}-06-30` };
+    if (dVal === 'q3') return { from: `${y}-07-01`, to: `${y}-09-30` };
+    if (dVal === 'q4') return { from: `${y}-10-01`, to: `${y}-12-31` };
+    // Range: 2024-01..2024-06
+    const rangeMatch = dVal.match(/^(\d{4}-\d{2}(?:-\d{2})?)\.\.(\d{4}-\d{2}(?:-\d{2})?)$/);
+    if (rangeMatch) return { from: rangeMatch[1], to: rangeMatch[2] };
+    return { prefix: dVal };
+}
+
+function matchDate(txnDate, dVal) {
+    const r = getDateRange(dVal);
+    if (r.prefix) return txnDate.startsWith(r.prefix);
+    if (r.from && r.to) return txnDate >= r.from && txnDate <= r.to;
+    return false;
+}
+
+function match(t, q) {
+    if(!q) return true; 
+    // Normalize amount filter operators
+    q = q.replace(/amt:\s*(>=|<=|[><=])?\s*(-?[\d\.]+)/gi, "amt:$1$2");
+    const terms = q.toLowerCase().trim().split(/\s+/);
+    return terms.every(termRaw => {
+        if (!termRaw) return true;
+        let term = termRaw;
+        let isNeg = false;
+        if (term.startsWith('-') && term.length > 1) {
+            const isNum = /^-\d/.test(term);
+            const isStruct = ['-amt:', '-tag:', '-date:', '-desc:', '-acc:'].some(p => term.startsWith(p));
+            if (isStruct || !isNum) { isNeg = true; term = term.substring(1); }
+        }
+        // Account filter: acc:expenses:food
+        if (term.startsWith('acc:')) {
+            const accFilter = term.substring(4);
+            const res = t.posts.some(p => p.acc.toLowerCase().includes(accFilter));
+            return isNeg ? !res : res;
+        }
+        // Desc filter: desc:grocery
+        if (term.startsWith('desc:')) {
+            const descFilter = term.substring(5);
+            const res = t.desc.toLowerCase().includes(descFilter);
+            return isNeg ? !res : res;
+        }
+        if (term.startsWith('amt:')) {
+            const opVal = term.substring(4);
+            let op = '=', val = 0;
+            if (opVal.startsWith('>=')) { op = '>='; val = parseFloat(opVal.substring(2)); }
+            else if (opVal.startsWith('<=')) { op = '<='; val = parseFloat(opVal.substring(2)); }
+            else if (opVal.startsWith('>')) { op = '>'; val = parseFloat(opVal.substring(1)); }
+            else if (opVal.startsWith('<')) { op = '<'; val = parseFloat(opVal.substring(1)); }
+            else if (opVal.startsWith('=')) { op = '='; val = parseFloat(opVal.substring(1)); }
+            else { val = parseFloat(opVal); }
+            if (isNaN(val)) return true; // malformed, skip
+            const matchesAmt = t.posts.some(p => {
+                const rv = Math.abs(p.val); // compare absolute values for usability
+                if (op === '>=') return rv >= val;
+                if (op === '<=') return rv <= val;
+                if (op === '>') return rv > val;
+                if (op === '<') return rv < val;
+                return Math.abs(rv - val) < 0.01;
+            });
+            return isNeg ? !matchesAmt : matchesAmt;
+        }
+        if (term.startsWith('date:')) {
+            const dVal = term.substring(5);
+            const res = matchDate(t.date, dVal);
+            return isNeg ? !res : res;
+        }
+        if (term.startsWith('tag:')) { 
+            const [k,v] = term.substring(4).split(':'); 
+            const res = (t.tags && t.tags[k] !== undefined && (!v || t.tags[k]===v || t.tags[k]===true)) ||
+                        t.posts.some(p => p.comment && parseTags(p.comment)[k] !== undefined && (!v || parseTags(p.comment)[k]===v || parseTags(p.comment)[k]===true));
+            return isNeg ? !res : res; 
+        }
+        // Flag filter: flag:* or flag:!
+        if (term.startsWith('flag:')) {
+            const fl = term.substring(5);
+            const res = t.flag === fl || (fl === 'cleared' && t.flag === '*') || (fl === 'pending' && t.flag === '!');
+            return isNeg ? !res : res;
+        }
+        const textMatch = t.desc.toLowerCase().includes(term) || 
+                          t.posts.some(p => p.acc.toLowerCase().includes(term) || (p.comment && p.comment.toLowerCase().includes(term)));
+        return isNeg ? !textMatch : textMatch;
+    });
+}
+
+const SETTINGS = { strictMode: localStorage.getItem('HL_STRICT')==='true', toggleStrict() { this.strictMode = !this.strictMode; localStorage.setItem('HL_STRICT', this.strictMode); updateStrictUI(); return this.strictMode; } };
+function updateStrictUI() { document.getElementById('strict-badge').style.display = SETTINGS.strictMode ? 'inline' : 'none'; } updateStrictUI();
+
+const FIXED_ROOTS = ['assets', 'liabilities', 'equity', 'income', 'expenses'];
+function isValidRoot(name) { return FIXED_ROOTS.includes(name.split(':')[0]); }
+
+/* =========================================
+   PWA & SERVICE WORKER MANAGER
+   ========================================= */
+/* =========================================
+   INLINE PWA — SINGLE FILE
+   Service Worker is compiled from a template string and registered
+   via a Blob URL. This makes the app fully installable and offline-
+   capable without requiring any external sw.js file.
+   ========================================= */
+const PwaManager = {
+    /* ── SVG icon ────────────────────────────────────────────────────── */
+    _icon: `data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="%230f172a"/><rect x="24" y="56" width="144" height="4" rx="2" fill="%2338bdf8"/><rect x="24" y="72" width="96" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="84" width="112" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="96" width="80" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="108" width="100" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="120" width="88" height="3" rx="1.5" fill="%23475569"/><rect x="120" y="68" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="80" width="48" height="3" rx="1.5" fill="%23f87171"/><rect x="120" y="92" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="104" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="116" width="48" height="3" rx="1.5" fill="%23f87171"/><text x="96" y="42" text-anchor="middle" font-family="monospace" font-size="20" font-weight="bold" fill="%2338bdf8">LEDGIE</text><rect x="24" y="132" width="144" height="2" rx="1" fill="%2338bdf8" opacity="0.4"/><text x="96" y="158" text-anchor="middle" font-family="monospace" font-size="13" fill="%2364748b">ledger</text></svg>`,
+
+    _deferredPrompt: null,
+    _reg: null,
+
+    /* ────────────────────────────────────────────────────────────────────
+       ARCHITECTURE: BLOB-URL SERVICE WORKER (correct for single-file PWA)
+       ──────────────────────────────────────────────────────────────────
+       A single HTML file cannot expose a real /sw.js endpoint, so we
+       compile the SW source into a Blob and register that.
+
+       Offline-after-restart works because:
+         1. On first online visit: SW installs, caches the page HTML.
+         2. Chrome also stores the start_url in its internal PWA store
+            when the app is installed to the home screen.
+         3. On restart (online or offline): Chrome loads the page from
+            its internal PWA cache / Cache Storage.
+         4. Page JS runs → new blob URL created → SW re-registers.
+            If an old SW is still alive Chrome reuses it; if not, the
+            new SW activates and serves from Cache Storage.
+
+       Key requirements for this to work:
+         • The app MUST be installed via "Add to Home Screen".
+         • The user must have visited at least once while online so the
+           SW could run its install event and cache the page.
+         • updateViaCache:'all' is set so Chrome uses Cache Storage for
+           SW script validation instead of always hitting the network.
+    ──────────────────────────────────────────────────────────────────── */
+
+    _buildSwSource(cacheName, pageUrl) {
+        return [
+            '/* Ledgie Service Worker */',
+            'const CACHE = ' + JSON.stringify(cacheName) + ';',
+            'const PAGE  = ' + JSON.stringify(pageUrl) + ';',
+            '',
+            'self.addEventListener("install", e => {',
+            '    e.waitUntil(',
+            '        caches.open(CACHE)',
+            '            .then(cache => cache.add(new Request(PAGE, { cache: "reload" })))',
+            '            .then(() => self.skipWaiting())',
+            '            .catch(err => { console.warn("SW install cache.add failed:", err); self.skipWaiting(); })',
+            '    );',
+            '});',
+            '',
+            'self.addEventListener("activate", e => {',
+            '    e.waitUntil(',
+            '        caches.keys()',
+            '            .then(keys => Promise.all(',
+            '                keys.filter(k => k !== CACHE).map(k => caches.delete(k))',
+            '            ))',
+            '            .then(() => self.clients.claim())',
+            '    );',
+            '});',
+            '',
+            'self.addEventListener("fetch", e => {',
+            '    if (e.request.method !== "GET") return;',
+            '    const url = new URL(e.request.url);',
+            '    if (url.origin !== location.origin) return;',
+            '    e.respondWith(',
+            '        caches.match(e.request).then(cached => {',
+            '            if (cached) return cached;',
+            '            return fetch(e.request).then(res => {',
+            '                if (res && res.status === 200) {',
+            '                    caches.open(CACHE).then(c => c.put(e.request, res.clone()));',
+            '                }',
+            '                return res;',
+            '            });',
+            '        }).catch(() => caches.match(PAGE))',
+            '    );',
+            '});',
+            '',
+            'self.addEventListener("message", e => {',
+            '    if (e.data === "skipWaiting") self.skipWaiting();',
+            '});'
+        ].join('\n');
+    },
+
+    /* ── Inject manifest ────────────────────────────────────────────── */
+    _injectManifest() {
+        const manifest = {
+            name: 'Ledgie — Smart Ledger',
+            short_name: 'Ledgie',
+            description: 'Personal finance ledger, hledger-compatible',
+            start_url: location.href.split('#')[0],
+            display: 'standalone',
+            background_color: '#0f172a',
+            theme_color: '#0f172a',
+            orientation: 'any',
+            categories: ['finance', 'productivity'],
+            icons: [
+                { src: this._icon, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+                { src: this._icon, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+            ]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        const link = document.createElement('link');
+        link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+
+        const appleIcon = document.createElement('link');
+        appleIcon.rel = 'apple-touch-icon'; appleIcon.href = this._icon;
+        document.head.appendChild(appleIcon);
+
+        const favicon = document.createElement('link');
+        favicon.rel = 'icon'; favicon.type = 'image/svg+xml'; favicon.href = this._icon;
+        document.head.appendChild(favicon);
+    },
+
+    /* ── Register SW via blob URL ───────────────────────────────────── */
+    async _registerSW() {
+        if (!('serviceWorker' in navigator)) return false;
+
+        const pageUrl   = location.href.split('#')[0];
+        const cacheName = 'ledgie-v11-' + pageUrl.replace(/[^a-z0-9]/gi, '_').slice(-40);
+        const swSource  = this._buildSwSource(cacheName, pageUrl);
+        const swBlob    = new Blob([swSource], { type: 'application/javascript' });
+        const swBlobUrl = URL.createObjectURL(swBlob);
+
+        try {
+            /* Use updateViaCache:'all' — tells Chrome not to bypass Cache Storage
+               when checking if the SW script needs updating. Without this, Chrome
+               always network-fetches the SW script URL on startup, which fails
+               for blob URLs after a browser restart. With 'all', if the SW is
+               already active in Chrome's SW database, Chrome trusts it without
+               re-fetching the blob (which no longer exists after restart). */
+            const reg = await navigator.serviceWorker.register(swBlobUrl, {
+                scope: './',
+                updateViaCache: 'all'
+            });
+            this._reg = reg;
+
+            await new Promise(resolve => {
+                if (reg.active) { resolve(); return; }
+                const sw = reg.installing || reg.waiting;
+                if (!sw) { resolve(); return; }
+                sw.addEventListener('statechange', function h() {
+                    if (sw.state === 'activated') { sw.removeEventListener('statechange', h); resolve(); }
+                });
+                setTimeout(resolve, 5000); // safety timeout
+            });
+
+            /* Belt-and-suspenders: explicitly cache the page now while online.
+               The SW install event also does this, but race conditions can occur. */
+            navigator.serviceWorker.ready.then(async () => {
+                try {
+                    const cache = await caches.open(cacheName);
+                    const hit   = await cache.match(pageUrl);
+                    if (!hit) {
+                        const resp = await fetch(pageUrl, { cache: 'reload' });
+                        if (resp.ok) await cache.put(pageUrl, resp);
+                    }
+                } catch (_) {}
+            });
+
+            document.getElementById('pwa-badge').style.display = 'inline';
+            return true;
+        } catch (err) {
+            console.error('SW blob registration failed:', err);
+            return false;
+        }
+    },
+
+    /* ── Public init ────────────────────────────────────────────────── */
+    async init() {
+        this._injectManifest();
+        const swOk = await this._registerSW();
+
+        window.addEventListener('offline', () => log('📴 Offline — running from cache.', 'warn'));
+        window.addEventListener('online',  () => log('📶 Back online.', 'success'));
+
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            this._deferredPrompt = e;
+            const badge = document.getElementById('pwa-badge');
+            if (badge) { badge.style.display = 'inline'; badge.title = 'App can be installed — type: install'; }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            this._deferredPrompt = null;
+            log('✓ Ledgie installed as an app!', 'success');
+        });
+
+        return swOk;
+    },
+
+    /* ── pwa status (async, checks real browser state) ──────────────── */
+    async showStatus() {
+        const hasSW      = 'serviceWorker' in navigator;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+        let swState = '✗ Not registered';
+        let swColor = 'var(--error)';
+        let cacheInfo = '—';
+
+        if (hasSW) {
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg) {
+                    const sw = reg.active || reg.installing || reg.waiting;
+                    swState = sw ? ('✓ ' + (reg.active ? 'Active' : reg.waiting ? 'Waiting' : 'Installing')) : '⚠ Registered (no worker)';
+                    swColor = reg.active ? 'var(--success)' : 'var(--warn)';
+                    this._reg = reg; // refresh in-memory ref
+                } 
+            } catch(e) { swState = '✗ Error: ' + e.message; }
+
+            try {
+                const keys  = await caches.keys();
+                const sizes = await Promise.all(keys.map(async k => {
+                    const c = await caches.open(k);
+                    const r = await c.keys();
+                    return r.length;
+                }));
+                const total = sizes.reduce((a,b)=>a+b,0);
+                cacheInfo = keys.length + ' cache(s), ' + total + ' entr' + (total===1?'y':'ies');
+            } catch(_) {}
+        }
+
+        log(`<div class="pnl-head">PWA STATUS</div>
+            <div class="stat-row"><span>Service Worker API</span><span style="color:${hasSW?'var(--success)':'var(--error)'}">${hasSW?'✓ Supported':'✗ Not available'}</span></div>
+            <div class="stat-row"><span>SW Registered</span><span style="color:${swColor}">${swState}</span></div>
+            <div class="stat-row"><span>Installed as App</span><span style="color:${isStandalone?'var(--success)':'var(--accent)'}">${isStandalone?'✓ Standalone':'Browser tab'}</span></div>
+            <div class="stat-row"><span>Cache Storage</span><span style="color:var(--accent)">${cacheInfo}</span></div>
+            <div class="stat-row"><span>Connection</span><span style="color:${navigator.onLine?'var(--success)':'var(--warn)'}">${navigator.onLine?'Online':'Offline'}</span></div>`);
+    },
+
+    /* ── Trigger install prompt ─────────────────────────────────────── */
+    async promptInstall() {
+        if (this._deferredPrompt) {
+            this._deferredPrompt.prompt();
+            const { outcome } = await this._deferredPrompt.userChoice;
+            this._deferredPrompt = null;
+            if (outcome === 'accepted') log('✓ Installing Ledgie…', 'success');
+            else log('Install dismissed.', 'system');
+            return;
+        }
+        const ua = navigator.userAgent;
+        if (/iPhone|iPad|iPod/.test(ua)) {
+            log('📱 iOS: Tap the <b>Share</b> button → <b>Add to Home Screen</b>', 'system');
+        } else if (/Android/.test(ua)) {
+            log('🤖 Android: Tap the browser menu → <b>Add to Home screen</b> or <b>Install app</b>', 'system');
+        } else {
+            log('🖥️ Desktop: Click the install icon (⊕) in your browser\'s address bar.', 'system');
+        }
+    },
+
+    /* ── Force SW update ────────────────────────────────────────────── */
+    async update() {
+        const reg = this._reg || await navigator.serviceWorker.getRegistration().catch(()=>null);
+        if (!reg) { log('No service worker registered.', 'warn'); return; }
+        await reg.update();
+        log('✓ Update check triggered. Reload to apply if found.', 'success');
+    }
+};
+
+// Boot PWA on load
+PwaManager.init().then(ok => {
+    if (!ok) console.info('Service Worker not available in this browser.');
+});
+
+/* =========================================
+   PERSISTENCE LAYER (HARDENED)
+   ========================================= */
+/* =========================================
+   FILE HANDLE STORE  (IndexedDB)
+   FileSystemFileHandle objects cannot be serialised into localStorage.
+   IndexedDB is the only supported persistence mechanism for them.
+   We keep one DB named "LedgieDB" with an object store "handles".
+   Key schema:  "fh:<ledgerName>"  → FileSystemFileHandle
+   ========================================= */
+const HandleStore = {
+    _db: null,
+    _DBNAME: 'LedgieDB',
+    _STORE: 'handles',
+
+    // Open (or create) the DB — returns a Promise<IDBDatabase>
+    _open() {
+        if (this._db) return Promise.resolve(this._db);
+        return new Promise((res, rej) => {
+            const req = indexedDB.open(this._DBNAME, 1);
+            req.onupgradeneeded = e => e.target.result.createObjectStore(this._STORE);
+            req.onsuccess = e => { this._db = e.target.result; res(this._db); };
+            req.onerror = e => rej(e.target.error);
+        });
+    },
+
+    async save(ledgerName, handle) {
+        try {
+            const db = await this._open();
+            return new Promise((res, rej) => {
+                const tx = db.transaction(this._STORE, 'readwrite');
+                tx.objectStore(this._STORE).put(handle, 'fh:' + ledgerName);
+                tx.oncomplete = () => res(true);
+                tx.onerror = e => rej(e.target.error);
+            });
+        } catch(e) { return false; }
+    },
+
+    async load(ledgerName) {
+        try {
+            const db = await this._open();
+            return new Promise((res, rej) => {
+                const tx = db.transaction(this._STORE, 'readonly');
+                const req = tx.objectStore(this._STORE).get('fh:' + ledgerName);
+                req.onsuccess = e => res(e.target.result || null);
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch(e) { return null; }
+    },
+
+    async remove(ledgerName) {
+        try {
+            const db = await this._open();
+            return new Promise((res) => {
+                const tx = db.transaction(this._STORE, 'readwrite');
+                tx.objectStore(this._STORE).delete('fh:' + ledgerName);
+                tx.oncomplete = () => res(true);
+                tx.onerror = () => res(false);
+            });
+        } catch(e) { return false; }
+    }
+};
+
+/* =========================================
+   PERSISTENCE
+   ========================================= */
+const Persistence = {
+    fileHandle: null,       // Active FileSystemFileHandle (in-memory only)
+    lastWriteTs: null,
+    _syncInterval: null,
+    _lastSyncedContent: null,
+    _permissionPending: false,
+    _writing: false,        // Concurrency guard — prevents overlapping writes
+
+    /* ------------------------------------------------------------------
+       PERMISSION MANAGEMENT
+       Rules:
+         • queryPermission()  — never needs a user gesture, always safe
+         • requestPermission() — REQUIRES a user gesture; silent on timers
+         • requiresGesture    — pass true when called from a timer/bg task
+       ------------------------------------------------------------------ */
+    async _ensurePermission(requiresGesture = false) {
+        if (!this.fileHandle) return false;
+        const opts = { mode: 'readwrite' };
+        try {
+            const state = await this.fileHandle.queryPermission(opts);
+            if (state === 'granted') return true;
+            if (state === 'denied') return false; // User explicitly denied — don't prompt
+
+            // state === 'prompt': we need a user gesture to request
+            if (requiresGesture) return false; // Can't prompt from timer — wait for next user action
+
+            if (this._permissionPending) return false; // Already showing a dialog
+            this._permissionPending = true;
+
+            const bannerId = 'perm-banner-' + Date.now();
+            log(`<div id="${bannerId}" class="line warn dismissible">🔐 Ledgie needs write access to your ledger file. <span class="dismiss-btn" onclick="document.getElementById('${bannerId}')?.remove()">Dismiss</span></div>`);
+
+            let result;
+            try { result = await this.fileHandle.requestPermission(opts); }
+            catch(e) { result = 'denied'; }
+            finally { this._permissionPending = false; }
+
+            document.getElementById(bannerId)?.remove();
+
+            if (result === 'granted') {
+                log('✓ Write permission granted — file sync resumed.', 'success');
+                return true;
+            } else {
+                // On explicit deny, remove stored handle so we don't keep nagging
+                await HandleStore.remove(LedgerManager.current);
+                log('⚠ Write permission denied. Changes are in localStorage. Use <b>mount</b> to re-link.', 'warn');
+                return false;
+            }
+        } catch(e) {
+            this._permissionPending = false;
+            return false;
+        }
+    },
+
+    /* ------------------------------------------------------------------
+       HANDLE CONFLICT RESOLUTION
+       Called when a stored/newly-picked handle's file content differs
+       from local localStorage content and we can't determine who is newer.
+       Returns: 'file' | 'local' | 'cancel'
+       ------------------------------------------------------------------ */
+    _resolveConflict(fileName, remoteLines, localLines) {
+        const msg =
+            `⚠️ CONFLICT: "${fileName}"\n\n` +
+            `  File on disk : ${remoteLines} lines\n` +
+            `  Local storage: ${localLines} lines\n\n` +
+            `Which version should be kept?\n` +
+            `  OK     → Use the FILE on disk (local changes will be backed up & discarded)\n` +
+            `  Cancel → Keep LOCAL version (file on disk will be overwritten)`;
+        return window.confirm(msg) ? 'file' : 'local';
+    },
+
+    /* ------------------------------------------------------------------
+       CORE MOUNT LOGIC — shared by mount() and remount()
+       ------------------------------------------------------------------ */
+    async _activateHandle(handle, { silent = false } = {}) {
+        const opts = { mode: 'readwrite' };
+
+        // 1. Verify permission (we have a user gesture here)
+        let permState = await handle.queryPermission(opts);
+        if (permState !== 'granted') {
+            try { permState = await handle.requestPermission(opts); }
+            catch(e) { permState = 'denied'; }
+        }
+        if (permState !== 'granted') throw new Error('Write permission denied.');
+
+        // 2. Read file — may throw if file was deleted/moved
+        let file, remoteText;
+        try {
+            file = await handle.getFile();
+            remoteText = await file.text();
+        } catch(e) {
+            // File is gone — clean up stored handle
+            await HandleStore.remove(LedgerManager.current);
+            throw new Error(`File not found or unreadable: ${e.message}`);
+        }
+
+        // 3. Guard: refuse empty files
+        if (!remoteText || remoteText.trim().length === 0) {
+            throw new Error(`File "${file.name}" is empty. Mount aborted to protect local data.`);
+        }
+
+        // 4. Guard: sanity-check — must look like a ledger (at least one date line)
+        if (!/^\d{4}[-/.]\d{2}[-/.]\d{2}/m.test(remoteText)) {
+            if (!window.confirm(`"${file.name}" doesn't look like a ledger file (no dated transactions found). Mount anyway?`)) {
+                throw new Error('Mount cancelled by user.');
+            }
+        }
+
+        // 5. Stop any existing sync before switching handles
+        this.stopSync();
+        const localText = LedgerManager.getRaw();
+        const isDefault = LedgerManager.isDefault();
+
+        if (isDefault) {
+            // 5a. No local data worth keeping — load from file
+            LedgerManager.loadRaw(remoteText);
+            if (!silent) log(`✓ Mounted: ${file.name} — loaded ${remoteText.split('\n').length} lines.`, 'success');
+        } else if (localText.trim() === remoteText.trim()) {
+            // 5b. Already in sync
+            if (!silent) log(`✓ Mounted: ${file.name} — already in sync.`, 'success');
+        } else {
+            // 5c. Conflict: both sides have real data and they differ
+            const resolution = this._resolveConflict(
+                file.name,
+                remoteText.split('\n').length,
+                localText.split('\n').length
+            );
+            if (resolution === 'file') {
+                // Backup local first, then load file
+                this.autoBackup(localText);
+                LedgerManager.loadRaw(remoteText);
+                log(`✓ Mounted: ${file.name} — loaded from disk. Local version backed up.`, 'success');
+            } else {
+                // Keep local, overwrite file
+                localStorage.setItem('HL_SAFETY_BACKUP', remoteText);
+                localStorage.setItem('HL_SAFETY_BACKUP_TS', new Date().toISOString());
+                // Write will happen in _doWrite after permission confirmed
+                if (!silent) log(`✓ Mounted: ${file.name} — local version kept. File will be overwritten.`, 'success');
+            }
+        }
+
+        // 6. Commit handle
+        this.fileHandle = handle;
+        this._lastSyncedContent = LedgerManager.getRaw();
+
+        // 7. Persist handle to IndexedDB for cross-session remount
+        await HandleStore.save(LedgerManager.current, handle);
+
+        // 8. If local won the conflict, write it now
+        if (!isDefault && localText.trim() !== remoteText.trim()) {
+            const resolution = localText.trim() === this._lastSyncedContent?.trim() ? 'local' : null;
+            // Only overwrite file if local won — detect by checking whether we loaded local or remote
+            const currentAfter = LedgerManager.getRaw();
+            if (currentAfter.trim() === localText.trim() && localText.trim() !== remoteText.trim()) {
+                await this._doWrite(localText);
+            }
+        }
+
+        // 9. Update UI
+        const badge = document.getElementById('mount-badge');
+        if (badge) { badge.style.display = 'inline'; badge.title = file.name; }
+
+        // 10. Start continuous sync
+        this._startContinuousSync();
+        return true;
+    },
+
+    /* ------------------------------------------------------------------
+       PUBLIC: MOUNT — always opens file picker (user gesture)
+       ------------------------------------------------------------------ */
+    async mount() {
+        if (!window.showOpenFilePicker) {
+            log('Error: File System API not supported. Use Chrome or Edge.', 'error');
+            return false;
+        }
+
+        // Warn if already mounted
+        if (this.fileHandle) {
+            const existing = this.fileHandle.name || 'current file';
+            if (!window.confirm(`Already mounted: "${existing}"\n\nPick a different file? (Current sync will stop)`)) return false;
+        }
+
+        let handle;
+        try {
+            [handle] = await window.showOpenFilePicker({
+                types: [{ description: 'Ledgie / Ledger Files', accept: {'text/plain': ['.hledger', '.journal', '.ledger', '.txt']} }],
+                multiple: false
+            });
+        } catch(e) {
+            if (e.name !== 'AbortError') log(`Mount failed: ${e.message}`, 'error');
+            return false;
+        }
+
+        // Check if same file as currently mounted (isSameEntry is the correct API)
+        if (this.fileHandle) {
+            try {
+                const same = await this.fileHandle.isSameEntry(handle);
+                if (same) { log(`Already mounted: "${handle.name}". No change.`, 'system'); return true; }
+            } catch(e) { /* ignore — proceed with new handle */ }
+        }
+
+        try {
+            return await this._activateHandle(handle);
+        } catch(e) {
+            log(`Mount failed: ${e.message}`, 'error');
+            return false;
+        }
+    },
+
+    /* ------------------------------------------------------------------
+       PUBLIC: REMOUNT — restore the saved handle for the current ledger.
+       Called on startup (no user gesture available then) and also
+       available as a user command when they want to re-link silently.
+       ------------------------------------------------------------------ */
+    async remount({ silent = false, fromStartup = false } = {}) {
+        if (!window.showOpenFilePicker) return false; // API not available
+
+        const handle = await HandleStore.load(LedgerManager.current);
+        if (!handle) {
+            if (!silent) log('No previously mounted file for this ledger.', 'system');
+            return false;
+        }
+
+        // On startup we cannot call requestPermission (no user gesture).
+        // queryPermission tells us if permission survived the session.
+        const opts = { mode: 'readwrite' };
+        let permState;
+        try { permState = await handle.queryPermission(opts); }
+        catch(e) { permState = 'denied'; }
+
+        if (permState === 'granted') {
+            // Great — we can silently restore without any user interaction
+            try {
+                return await this._activateHandle(handle, { silent });
+            } catch(e) {
+                // File may have moved/been deleted
+                if (!silent) log(`Auto-remount failed: ${e.message}`, 'warn');
+                this._showRemountBanner(handle.name || 'previous file');
+                return false;
+            }
+        } else if (permState === 'denied') {
+            await HandleStore.remove(LedgerManager.current);
+            if (!silent) log('Stored file permission was denied — handle cleared. Use <b>mount</b> to re-link.', 'warn');
+            return false;
+        } else {
+            // permState === 'prompt' — need user gesture, show banner
+            this._showRemountBanner(handle.name || 'previous file', handle);
+            return false;
+        }
+    },
+
+    /* ------------------------------------------------------------------
+       Show a clickable banner to trigger remount with user gesture
+       ------------------------------------------------------------------ */
+    _showRemountBanner(fileName, handle = null) {
+        const bannerId = 'remount-banner';
+        if (document.getElementById(bannerId)) return; // already shown
+        const action = handle
+            ? `Persistence._activateHandle(${JSON.stringify(null)})` // placeholder
+            : `run('mount')`;
+        // We store the handle reference on window so the inline handler can reach it
+        window._pendingRemountHandle = handle;
+        log(`<div id="${bannerId}" class="line warn dismissible">
+            🔗 <b>${escapeHtml(fileName)}</b> was previously mounted.
+            <span class="dismiss-btn" onclick="Persistence._doRemountFromBanner()">Re-link file</span>
+            <span class="dismiss-btn" style="margin-left:6px;color:var(--accent)" onclick="document.getElementById('${bannerId}')?.remove();HandleStore.remove('${LedgerManager.current}')">Forget</span>
+        </div>`);
+    },
+
+    // Called from the banner button — now we have a user gesture
+    async _doRemountFromBanner() {
+        const banner = document.getElementById('remount-banner');
+        const handle = window._pendingRemountHandle;
+        banner?.remove();
+
+        if (handle) {
+            try {
+                return await this._activateHandle(handle);
+            } catch(e) {
+                log(`Re-link failed: ${e.message}. Opening file picker…`, 'warn');
+            }
+        }
+        // Fallback: open picker so user can find the file manually
+        return await this.mount();
+    },
+
+    /* ------------------------------------------------------------------
+       LOW-LEVEL WRITE — assumes permission already verified
+       ------------------------------------------------------------------ */
+    async _doWrite(content) {
+        if (this._writing) return; // Concurrency guard
+        this._writing = true;
+        try {
+            const writable = await this.fileHandle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            this.lastWriteTs = new Date().toISOString();
+            const badge = document.getElementById('mount-badge');
+            if (badge) {
+                const t = new Date(this.lastWriteTs);
+                badge.title = `${this.fileHandle.name} · saved ${t.toLocaleTimeString()}`;
+            }
+        } finally {
+            this._writing = false;
+        }
+    },
+
+    /* ------------------------------------------------------------------
+       PUBLIC WRITE — localStorage first, then file
+       ------------------------------------------------------------------ */
+    async write(content) {
+        if (content === null || content === undefined) { log('CRITICAL: Attempted to write null/undefined. Aborted.', 'error'); return false; }
+        if (content.trim().length === 0) { log('CRITICAL: Attempted to write empty content. Aborted.', 'error'); return false; }
+        LedgerManager.saveLocal(content);
+        this.lastWriteTs = new Date().toISOString();
+        if (this.fileHandle) {
+            try {
+                // requiresGesture=false because write() is always triggered by user actions (add, rm, undo…)
+                const hasPerm = await this._ensurePermission(false);
+                if (!hasPerm) return false;
+                await this._doWrite(content);
+                this._lastSyncedContent = content;
+                return true;
+            } catch(e) {
+                log(`⚠ File write failed: ${e.message}. Data saved to localStorage only.`, 'warn');
+                return false;
+            }
+        }
+        return true;
+    },
+
+    /* ------------------------------------------------------------------
+       CONTINUOUS SYNC — polls every 5s for dirty data
+       ------------------------------------------------------------------ */
+    _startContinuousSync() {
+        if (this._syncInterval) clearInterval(this._syncInterval);
+        this._syncInterval = setInterval(async () => {
+            if (!this.fileHandle) { clearInterval(this._syncInterval); this._syncInterval = null; return; }
+            if (this._writing) return; // Wait for in-progress write
+            const current = LedgerManager.getRaw();
+            if (!current || current === this._lastSyncedContent) return;
+            try {
+                // requiresGesture=true — we're in a timer, cannot pop a dialog
+                const hasPerm = await this._ensurePermission(true);
+                if (!hasPerm) return;
+                await this._doWrite(current);
+                this._lastSyncedContent = current;
+            } catch(e) { /* silent — log would spam every 5s */ }
+        }, 5000);
+    },
+
+    /* ------------------------------------------------------------------
+       STOP SYNC + CLEAR HANDLE (call on ledger switch / unmount)
+       ------------------------------------------------------------------ */
+    stopSync() {
+        if (this._syncInterval) { clearInterval(this._syncInterval); this._syncInterval = null; }
+    },
+
+    unmount(clearStored = false) {
+        this.stopSync();
+        this.fileHandle = null;
+        this._lastSyncedContent = null;
+        this._writing = false;
+        this._permissionPending = false;
+        const badge = document.getElementById('mount-badge');
+        if (badge) badge.style.display = 'none';
+        if (clearStored) HandleStore.remove(LedgerManager.current);
+    },
+
+    /* ------------------------------------------------------------------
+       AUTO-BACKUP to localStorage
+       ------------------------------------------------------------------ */
+    autoBackup(content) {
+        if (!content || content.trim().length === 0) return;
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const key = `HL_AUTOBACKUP_${ts}`;
+        try {
+            const backupKeys = Object.keys(localStorage).filter(k => k.startsWith('HL_AUTOBACKUP_')).sort();
+            while (backupKeys.length >= 5) { localStorage.removeItem(backupKeys.shift()); }
+            localStorage.setItem(key, content);
+        } catch(e) { /* Storage full — skip */ }
+    },
+
+    listBackups() {
+        return Object.keys(localStorage)
+            .filter(k => k.startsWith('HL_AUTOBACKUP_') || k === 'HL_SAFETY_BACKUP')
+            .sort().reverse();
+    }
+};
+
+/* =========================================
+   MANAGERS
+   ========================================= */
+const ConfigManager = {
+    data: JSON.parse(localStorage.getItem('HL_CONFIG')||'{"backup_reminder":"3", "safety_word":"yes"}'),
+    set(k, v) { this.data[k] = v; localStorage.setItem('HL_CONFIG', JSON.stringify(this.data)); },
+    get(k) { return this.data[k]; },
+    getTxnCount() { return parseInt(localStorage.getItem('HL_TXN_COUNT')||'0'); },
+    incTxnCount() { const n = this.getTxnCount() + 1; localStorage.setItem('HL_TXN_COUNT', n); return n; },
+    resetTxnCount() { localStorage.setItem('HL_TXN_COUNT', '0'); },
+    checkBackup() {
+        const limit = this.get('backup_reminder'); if (limit === 'false') return;
+        const count = this.getTxnCount(); const max = parseInt(limit);
+        if (!isNaN(max) && count >= max) log(`<div class="line dismissible"><span>⚠️ Backup recommended (${count} unsaved changes).</span><span class="dismiss-btn" onclick="ConfigManager.resetTxnCount();this.parentElement.remove()">[DISMISS]</span></div>`);
+    }
+};
+
+const ConfirmationMode = {
+    active: false, callback: null, targetWord: '',
+    start(cmdName, action) {
+        this.targetWord = ConfigManager.get('safety_word') || 'yes';
+        this.callback = action; this.active = true;
+        document.body.classList.add('confirm-mode');
+        document.getElementById('prompt-char').innerText = '⚠️';
+        log(`DANGEROUS ACTION: ${cmdName.toUpperCase()}`, 'warn');
+        log(`Type '${this.targetWord}' to confirm or 'cancel'.`, 'system');
+        updatePrediction();
+    },
+    process(val) {
+        if (val === 'cancel') { this.reset(); log('Action cancelled.', 'success'); return; }
+        if (val === this.targetWord) { this.callback(); this.reset(); } else { log(`Incorrect confirmation.`, 'error'); }
+    },
+    reset() { this.active = false; this.callback = null; document.body.classList.remove('confirm-mode'); document.getElementById('prompt-char').innerText = '$'; updatePrediction(); }
+};
+
+const ThemeManager = {
+    init() { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); if(t.preset) this.setPreset(t.preset); if(t.font) this.setFont(t.font); if(t.bg) this.setBg(t.bg); if(t.text) this.setText(t.text); },
+    save(k, v) { const t = JSON.parse(localStorage.getItem('HL_THEME_CFG')||'{}'); t[k] = v; localStorage.setItem('HL_THEME_CFG', JSON.stringify(t)); },
+    setPreset(name) { document.documentElement.setAttribute('data-theme', name); this.save('preset', name); },
+    setFont(size) { document.documentElement.style.setProperty('--font-size', size); this.save('font', size); },
+    setBg(color) { document.documentElement.style.setProperty('--bg', color); this.save('bg', color); },
+    setText(color) { document.documentElement.style.setProperty('--text', color); this.save('text', color); },
+    reset() { localStorage.removeItem('HL_THEME_CFG'); document.documentElement.removeAttribute('data-theme'); document.documentElement.style = ''; }
+};
+ThemeManager.init();
+
+const BudgetManager = {
+    budgets: JSON.parse(localStorage.getItem('HL_BUDGETS')||'{}'),
+    set(cat, amt) { this.budgets[cat] = parseFloat(amt); this.save(); },
+    remove(cat) { delete this.budgets[cat]; this.save(); },
+    get() { return this.budgets; },
+    save() { localStorage.setItem('HL_BUDGETS', JSON.stringify(this.budgets)); }
+};
+
+/* =========================================
+   LEDGER PARSER (V2 TRANSACTIONAL)
+   ========================================= */
+let transactions = []; let assertions = []; let headerLines = []; let directiveLines = []; let allowedAccounts = new Set(); let availableTags = new Set(); let fileAliases = {}; let availableCommodities = new Set();
+
+function parseCommodity(rawAmt) {
+    if (!rawAmt) return { val: 0, comm: '', pos: '', price: null, lotPrice: null };
+    // Strip balance assertion suffix: "1000 TRY = 1000 TRY" → "1000 TRY"
+    let rest = rawAmt.replace(/\s*=\s*[\d.,]+\s*\S*\s*$/, '').trim();
+    // Extract @ price annotation: "0.5 BTC @ 60000 USD" or "80 APPL @ 112.5 TRY"
+    let price = null;
+    const atIdx = rest.indexOf(' @ ');
+    if (atIdx !== -1) { price = rest.slice(atIdx + 3).trim(); rest = rest.slice(0, atIdx).trim(); }
+    // Extract lot price: "10 AAPL {150 USD}"
+    let lotPrice = null;
+    const lotMatch = rest.match(/\{([^}]+)\}/);
+    if (lotMatch) { lotPrice = lotMatch[1].trim(); rest = rest.replace(/\s*\{[^}]+\}/, '').trim(); }
+    // Handle European number format (e.g. 1.000,50)
+    const isEuro = /,\d{1,2}$/.test(rest) && rest.includes('.');
+    let valStr = rest;
+    if (isEuro) { valStr = rest.replace(/\./g, '').replace(',', '.'); }
+    else { valStr = rest.replace(/,/g, ''); }
+    // Match commodity+amount. Supports:
+    //   left-symbol:  $100  €50  ₺9000
+    //   right-symbol: 100 USD   80 AAPL   9000 TRY
+    // Left side: non-digit, non-plus/minus chars (currency symbols, letters)
+    // Right side: word chars (letters + digits + underscore) for tickers like TRY, AAPL, BTC
+    const m = valStr.match(/^([^\d.\-+]*?)(\-?[\d.]+)\s*([A-Za-z_][A-Za-z\d_]*)\s*$/) ||
+              valStr.match(/^([^\d.\-+]*?)(\-?[\d.]+)\s*$/);
+    if (!m) return { val: parseFloat(valStr) || 0, comm: '', pos: '', price, lotPrice };
+    const p1 = m[1].trim();
+    const p3 = (m[3] || '').trim();
+    return { val: parseFloat(m[2]) || 0, comm: p1 || p3 || '', pos: p1 ? 'left' : (p3 ? 'right' : ''), price, lotPrice };
+}
+
+function parseTags(comment, tagSet) {
+    const tags = {}; if (!comment) return tags;
+    // hledger supports: tag:value and standalone tags like ;tag1:, tag2: or #hashtag
+    // Match: word: (key-only), word:value, or #word
+    const matches = comment.matchAll(/(?:^|\s)(?:#([\p{L}\p{N}_-]+)|([\p{L}\p{N}_][\p{L}\p{N}_-]*):([\p{L}\p{N}_-]*))/gu);
+    for (const m of matches) { 
+        if (m[1]) {
+            // #hashtag style
+            tags[m[1]] = true; 
+            if (tagSet) tagSet.add('tag:'+m[1]); else availableTags.add('tag:'+m[1]);
+        } else if (m[2]) {
+            // key: or key:value style  
+            tags[m[2]] = m[3] || true; 
+            if (tagSet) tagSet.add('tag:'+m[2]); else availableTags.add('tag:'+m[2]);
+        }
+    }
+    return tags;
+}
+
+function parseData(source) {
+    if (source === null || source === undefined) { log("Error: Parser received null input.", 'error'); return; }
+    const candTxns = []; const candHeads = []; const candDirs = []; const candAsserts = [];
+    const candAccs = new Set(); const candTags = new Set(); const candAliases = {}; const candComms = new Set();
+    const lines = source.split('\n'); let txn = null;
+    try {
+        lines.forEach(line => {
+            // Determine comment: ; or # at start of line (not inside strings)
+            // % is ledger-only comment but we accept it
+            const stripped = line.trimStart();
+            if (stripped.startsWith(';') || stripped.startsWith('#') || stripped.startsWith('%')) {
+                // Pure comment line — store as header if no active transaction
+                if (!txn) candHeads.push(line);
+                return;
+            }
+
+            // Split at first ; for inline comment (but not inside account names with quotes)
+            const semiIdx = line.indexOf(';');
+            const clean = (semiIdx !== -1 ? line.slice(0, semiIdx) : line).trimEnd();
+            const comment = semiIdx !== -1 ? line.slice(semiIdx).trim() : '';
+
+            // Blank line — flush current transaction
+            if (!clean.trim()) {
+                if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); txn = null; }
+                else { candHeads.push(line); }
+                return;
+            }
+
+            // Directives: account, commodity, include, P, D, Y, apply account, end apply account
+            if (/^account\s+/.test(clean)) {
+                candDirs.push(line);
+                const accName = clean.replace(/^account\s+/, '').trim();
+                if (accName) candAccs.add(accName);
+                return;
+            }
+            if (/^commodity\s+/.test(clean)) {
+                const comm = clean.replace(/^commodity\s+/, '').trim().split(/\s/)[0];
+                if (comm) candComms.add(comm);
+                candDirs.push(line); return;
+            }
+            if (/^(include|P |D |Y )\s*/.test(clean) || /^apply account/.test(clean) || /^end apply/.test(clean)) {
+                candDirs.push(line); return;
+            }
+            // Alias directive
+            const aliasMatch = clean.match(/^alias\s+(.*?)\s*=\s*(.*)$/);
+            if (aliasMatch && aliasMatch[2]) {
+                candDirs.push(line);
+                candAliases[aliasMatch[1].trim()] = aliasMatch[2].trim();
+                return;
+            }
+            // Periodic transaction header (~ ...)
+            if (/^~/.test(clean)) { candDirs.push(line); return; }
+
+            // Balance assertion: DATE balance ACCOUNT AMOUNT
+            const balMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})\s+balance\s+([\w:"'()\[\]]+)\s+(.*)$/);
+            if (balMatch) {
+                const p = parseCommodity(balMatch[3]);
+                candAsserts.push({ date: balMatch[1], acc: balMatch[2], val: p.val, comm: p.comm, raw: line });
+                if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); txn = null; }
+                return;
+            }
+
+            // Transaction header: DATE[=DATE2] [FLAG] [CODE] DESCRIPTION
+            // DATE format: YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+            const dMatch = clean.match(/^(\d{4}[-/.]\d{2}[-/.]\d{2})(?:=(\d{4}[-/.]\d{2}[-/.]\d{2}))?\s*([!*])?\s*(?:\(([^)]*)\)\s*)?(.*)$/);
+            if (dMatch) {
+                if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); }
+                txn = {
+                    id: candTxns.length,
+                    date:  dMatch[1],
+                    date2: dMatch[2] || null,          // secondary date
+                    flag:  dMatch[3] ? dMatch[3].trim() : '',
+                    code:  dMatch[4] ? dMatch[4].trim() : '',  // (INV-001)
+                    desc:  dMatch[5].trim(),
+                    posts: [],
+                    comment: comment,
+                    tags: parseTags(comment, candTags)
+                };
+                return;
+            }
+
+            // Posting line: must be indented (1+ space)
+            if (/^\s/.test(line) && txn) {
+                const postClean = (semiIdx !== -1 ? line.slice(0, semiIdx) : line).trimEnd();
+                const postTrimmed = postClean.trimStart();
+
+                // Comment-only posting line: "    ; employer:ACME"
+                if (!postTrimmed || /^[;#%]/.test(postTrimmed)) {
+                    // Append to transaction's comment tags
+                    const extraTags = parseTags(line.trim(), candTags);
+                    Object.assign(txn.tags, extraTags);
+                    return;
+                }
+
+                // Detect virtual posting brackets: () or []
+                let isVirtual = false;
+                let isUnbalancedVirtual = false;
+                let postLine = postTrimmed;
+                if (/^\(.*\)/.test(postLine)) { isVirtual = true; }
+                if (/^\[.*\]/.test(postLine)) { isVirtual = true; isUnbalancedVirtual = true; }
+
+                // posting regex: account (may include virtual markers) then optional 2+ spaces + amount
+                const pMatch = postClean.match(ACC_RE.posting);
+                if (!pMatch) return;
+
+                let acc = pMatch[2].trim();
+                // Resolve alias
+                const resolvedAlias = candAliases[acc] || candAliases[acc.replace(/[()[\]]/g, '')] || acc;
+                acc = resolvedAlias;
+                if (!SETTINGS.strictMode) candAccs.add(acc.replace(/[()[\]]/g, ''));
+
+                const rawAmt = pMatch[3] ? pMatch[3].trim() : '';
+                const parsed = parseCommodity(rawAmt);
+                txn.posts.push({
+                    acc, rawAmt,
+                    isImplicit: rawAmt === '',
+                    isVirtual,
+                    isUnbalancedVirtual,
+                    price: parsed.price,
+                    lotPrice: parsed.lotPrice,
+                    comment,
+                    ...parsed
+                });
+                return;
+            }
+
+            // Fallback: unrecognized non-indented line — store as header
+            if (!txn) candHeads.push(line);
+        });
+        if (txn) { candTxns.push(finalize(txn, candTxns.length, false)); }
+        transactions = candTxns;
+        headerLines = candHeads;
+        directiveLines = candDirs;
+        assertions = candAsserts;
+        allowedAccounts = candAccs;
+        availableTags = candTags;
+        fileAliases = candAliases;
+        // Collect commodities from actual posting data too (not just commodity directives)
+        transactions.forEach(t => t.posts.forEach(p => { if (p.comm) candComms.add(p.comm); if (p.price) { const pc = parseCommodity(p.price); if (pc.comm) candComms.add(pc.comm); } }));
+        availableCommodities = candComms;
+        ENGINE.accounts = Array.from(allowedAccounts).sort();
+    } catch(e) {
+        log(`CRITICAL PARSE ERROR: ${e.message}. State rolled back.`, 'error');
+        console.error(e);
+    }
+}
+
+function finalize(txn, id, strict = true) {
+    txn.id = id;
+    let implicitPost = null;
+    const comms = {}; // per-commodity sum for balance check
+    txn.posts.forEach(p => {
+        p.val = Math.round((p.val + Number.EPSILON) * 100) / 100;
+        // Unbalanced virtual postings [] are excluded from balance check
+        if (p.isUnbalancedVirtual) return;
+        const c = p.comm || '';
+        if (p.isImplicit) {
+            if (implicitPost && strict) throw new Error('Multiple implicit postings in "' + txn.desc + '"');
+            implicitPost = p;
+        } else {
+            comms[c] = Math.round(((comms[c] || 0) + p.val + Number.EPSILON) * 100) / 100;
+        }
+    });
+    if (implicitPost) {
+        const nonZeroComms = Object.keys(comms).filter(k => Math.abs(comms[k]) > 0.005);
+        if (nonZeroComms.length === 1) {
+            const c = nonZeroComms[0];
+            implicitPost.val = Math.round((-comms[c] + Number.EPSILON) * 100) / 100;
+            implicitPost.comm = c;
+            implicitPost.pos = txn.posts.find(p => p.comm === c && !p.isImplicit)?.pos || 'right';
+            implicitPost.isImplicit = false;
+        } else if (nonZeroComms.length === 0) {
+            implicitPost.val = 0;
+        } else {
+            // Multi-commodity: implicit posting is ambiguous — leave as-is, flag
+            const msg = 'Ambiguous auto-balance in "' + txn.desc + '" — multiple commodities';
+            if (strict) throw new Error(msg);
+            txn._error = msg;
+        }
+    } else {
+        // No implicit posting: each commodity must net to zero
+        const errors = [];
+        Object.keys(comms).forEach(c => {
+            if (Math.abs(comms[c]) > 0.005)
+                errors.push(`${c || 'default'} off by ${fmtNum(comms[c])}`);
+        });
+        if (errors.length > 0) {
+            const msg = 'Unbalanced: ' + errors.join(', ');
+            if (strict) throw new Error(msg);
+            txn._error = msg;
+        }
+    }
+    return txn;
+}
+
+function reconstructFile() {
+    let out = '';
+    // Header comments
+    if (headerLines.length > 0) {
+        // Keep non-empty header lines, skip sequences of multiple blank lines
+        let prevBlank = false;
+        headerLines.forEach(l => {
+            const isEmpty = !l.trim();
+            if (isEmpty && prevBlank) return; // collapse consecutive blanks
+            out += l + '\n';
+            prevBlank = isEmpty;
+        });
+        if (!out.endsWith('\n\n')) out += '\n';
+    }
+    // Directives (account, commodity, alias, include, P, etc.)
+    if (directiveLines.length > 0) {
+        directiveLines.forEach(l => out += l + '\n');
+        out += '\n';
+    }
+    // Transactions sorted by date
+    const sortedTxns = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+    sortedTxns.forEach(t => {
+        // Header: DATE[=DATE2] [FLAG] [(CODE)] DESCRIPTION [; comment]
+        let header = t.date;
+        if (t.date2) header += '=' + t.date2;
+        if (t.flag) header += ' ' + t.flag;
+        if (t.code) header += ' (' + t.code + ')';
+        header += ' ' + t.desc;
+        if (t.comment) header += '  ' + t.comment;
+        out += header + '\n';
+        // Postings
+        t.posts.forEach(p => {
+            let amtStr = '';
+            if (!p.isImplicit) {
+                const num = fmtNum(p.val);
+                amtStr = p.comm ? (p.pos === 'left' ? `${p.comm}${num}` : `${num} ${p.comm}`) : num;
+                if (p.lotPrice) amtStr += ' {' + p.lotPrice + '}';
+                if (p.price)    amtStr += ' @ ' + p.price;
+            }
+            // Restore virtual posting brackets
+            let accOut = p.acc;
+            if (p.isUnbalancedVirtual && !/^\[/.test(accOut)) accOut = '[' + accOut.replace(/[()[\]]/g,'') + ']';
+            else if (p.isVirtual && !/^\(/.test(accOut))      accOut = '(' + accOut.replace(/[()[\]]/g,'') + ')';
+            const postComment = p.comment ? '  ' + p.comment : '';
+            // hledger spec: account and amount on same line, at least 2 spaces apart
+            out += amtStr ? `    ${accOut}  ${amtStr}${postComment}\n` : `    ${accOut}${postComment}\n`;
+        });
+        out += '\n';
+    });
+    if (assertions.length > 0) {
+        assertions.forEach(a => out += `${a.raw}\n`);
+    }
+    return out.trim() + '\n';
+}
+
+const LedgerManager = {
+    current: localStorage.getItem('HL_META')||'default',
+    list: () => Object.keys(localStorage).filter(k=>k.startsWith('HL_DATA_')).map(k=>k.replace('HL_DATA_','')),
+    load() { 
+        const data = localStorage.getItem('HL_DATA_' + this.current); 
+        if (data) { parseData(data); } else { this.loadDefault(); } 
+        document.getElementById('ledger-badge').innerText = this.current; 
+    },
+    getDefaultTemplate() { 
+        let data = "; ledgie init — created " + new Date().toISOString().slice(0,10) + "\nalias food = expenses:food\n\n"; 
+        FIXED_ROOTS.forEach(r => data += `account ${r}\n`); 
+        data += "\n2023-01-01 opening balance\n    assets:bank  $1000.00\n    equity:opening\n"; 
+        return data; 
+    },
+    loadDefault() { let data = this.getDefaultTemplate(); this.saveLocal(data); parseData(data); },
+    isDefault() { 
+        const current = this.getRaw().trim(); 
+        const defRaw = this.getDefaultTemplate().trim();
+        // Compare transaction counts not raw text (template may vary)
+        return transactions.length <= 1 && current.includes('opening balance');
+    },
+    loadRaw(text) { 
+        // Disaster protection: validate before parsing
+        if (!text || text.trim().length === 0) { log("⚠ Refusing to load empty content.", 'error'); return; }
+        parseData(text); 
+        this.saveLocal(text); 
+    }, 
+    reset() { 
+        // Auto-backup before reset
+        const current = localStorage.getItem('HL_DATA_' + this.current);
+        if (current) Persistence.autoBackup(current);
+        localStorage.removeItem('HL_DATA_' + this.current); 
+        this.loadDefault(); 
+        log('Ledger reset. Previous data auto-backed up.', 'warn'); 
+    },
+    async switch(n) { 
+        // Unmount current ledger's file (don't clear stored handle — just disconnect in-memory)
+        Persistence.unmount(false);
+        this.current = n.toLowerCase(); 
+        localStorage.setItem('HL_META', this.current); 
+        this.load(); 
+        log(`Switched to ledger: ${this.current}`, 'success');
+        // Attempt to restore the mounted file for the new ledger
+        const restored = await Persistence.remount({ silent: true });
+        if (!restored) {
+            // No saved handle for this ledger — show local storage warning if needed
+            if (window.showOpenFilePicker && !this.isDefault()) {
+                log(`<div class="line warn dismissible" style="cursor:pointer">⚠️ No file mounted for "<b>${escapeHtml(this.current)}</b>". <span class="dismiss-btn" onclick="run('mount')">Mount file</span></div>`);
+            }
+        }
+    },
+    saveLocal(d) { 
+        try { 
+            localStorage.setItem('HL_DATA_' + this.current, d); 
+        } catch(e) { 
+            if(e.name === 'QuotaExceededError') { 
+                log("⚠ STORAGE FULL! Attempting to free space by pruning backups...", 'error'); 
+                // Prune auto-backups to free space
+                Object.keys(localStorage).filter(k => k.startsWith('HL_AUTOBACKUP_')).forEach(k => localStorage.removeItem(k));
+                try { localStorage.setItem('HL_DATA_' + this.current, d); } 
+                catch(e2) { log("CRITICAL: Cannot save — storage full even after pruning. Export your data immediately!", 'error'); }
+            } 
+        } 
+    },
+    save(d) { 
+        if (!d || d.trim().length === 0) { log("CRITICAL: Refusing to save empty data.", 'error'); return; }
+        Persistence.write(d); 
+    },
+    getRaw() { return reconstructFile(); },
+    delete(index) { 
+        if (index < 0 || index >= transactions.length) { return false; }
+        // Auto-backup before deletion
+        Persistence.autoBackup(this.getRaw());
+        transactions.splice(index, 1); 
+        // Re-number IDs
+        transactions.forEach((t, i) => t.id = i);
+        const raw = reconstructFile();
+        this.save(raw); 
+        parseData(raw); 
+        return true; 
+    },
+    addAccount(name) { 
+        if (!isValidRoot(name)) { log(`Error: Root account must start with: ${FIXED_ROOTS.join(', ')}`, 'error'); return false; } 
+        if (allowedAccounts.has(name)) { log(`Account "${name}" already exists.`, 'warn'); return false; }
+        directiveLines.push(`account ${name}`); 
+        const raw = reconstructFile();
+        this.save(raw); 
+        parseData(raw); 
+        return true; 
+    },
+    addAssertion(acc, val) { 
+        if (!allowedAccounts.has(acc) && !ENGINE.accounts.includes(acc)) {
+            log(`Warning: Account "${acc}" not in chart of accounts.`, 'warn');
+        }
+        const today = new Date().toISOString().split('T')[0]; 
+        assertions.push({ date: today, acc: acc, val: parseFloat(val), raw: `${today} balance ${acc}    ${fmtNum(parseFloat(val))}` }); 
+        const raw = reconstructFile();
+        this.save(raw); 
+        parseData(raw); 
+        return true; 
+    },
+    addAlias(key, val) { 
+        if (!key || !val) { log("Usage: alias add <alias> <full:account>", 'error'); return false; }
+        // Prevent duplicate aliases
+        if (fileAliases[key]) { log(`Alias "${key}" already exists (→ ${fileAliases[key]}). Remove first.`, 'warn'); return false; }
+        directiveLines.push(`alias ${key} = ${val}`); 
+        const raw = reconstructFile();
+        this.save(raw); 
+        parseData(raw); 
+        return true; 
+    },
+    merge(newText) {
+        if (!newText || newText.trim().length === 0) { log("Merge aborted: empty file.", 'error'); return; }
+        // Backup before merge
+        Persistence.autoBackup(this.getRaw());
+        const oldTxns = [...transactions]; const oldDirs = [...directiveLines]; const oldAsserts = [...assertions]; const oldAliases = {...fileAliases};
+        parseData(newText);
+        const newTxns = [...transactions]; const newDirs = [...directiveLines]; const newAsserts = [...assertions]; const newAliases = {...fileAliases};
+        transactions = [...oldTxns, ...newTxns];
+        const dirSet = new Set(oldDirs); newDirs.forEach(d => dirSet.add(d)); directiveLines = Array.from(dirSet);
+        assertions = [...oldAsserts, ...newAsserts]; fileAliases = {...oldAliases, ...newAliases};
+        const mergedRaw = reconstructFile(); this.save(mergedRaw); parseData(mergedRaw); 
+        log(`✓ Merged ${newTxns.length} transactions, ${newDirs.length} directives. Previous state backed up.`, 'success');
+    }
+};
+
+/* =========================================
+   TITANIUM GRAPH ENGINE V4 — IMPROVED
+   ========================================= */
+const GraphEngine = {
+    palette: ['#38bdf8', '#4ade80', '#f87171', '#fbbf24', '#a78bfa', '#22d3ee', '#f472b6', '#94a3b8'],
+
+    /* Smooth catmull-rom spline → cubic bezier */
+    catmullRom2bezier(points) {
+        if (points.length === 1) return `M ${points[0][0]},${points[0][1]}`;
+        let d = `M ${points[0][0]},${points[0][1]}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(i - 1, 0)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(i + 2, points.length - 1)];
+            const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+            const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+            const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+            const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+            d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+        }
+        return d;
+    },
+
+    /* "Nice number" axis algorithm — guaranteed sane ticks */
+    getNiceTicks(minVal, maxVal, targetCount = 5) {
+        if (!isFinite(minVal) || !isFinite(maxVal)) return { min: 0, max: 100, ticks: [0, 25, 50, 75, 100] };
+        // Ensure we always show the zero line when data spans it
+        const lo = Math.min(minVal, 0);
+        const hi = Math.max(maxVal, 0);
+        if (lo === hi) { return { min: lo - 1, max: hi + 1, ticks: [lo, hi + 1] }; }
+        const rawRange = hi - lo;
+        const rawStep = rawRange / (targetCount - 1);
+        const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+        const f = rawStep / magnitude;
+        let niceStep;
+        if (f < 1.5) niceStep = 1;
+        else if (f < 3) niceStep = 2;
+        else if (f < 7) niceStep = 5;
+        else niceStep = 10;
+        niceStep *= magnitude;
+        const niceMin = Math.floor(lo / niceStep) * niceStep;
+        const niceMax = Math.ceil(hi / niceStep) * niceStep;
+        const ticks = [];
+        // Guard: cap at 20 ticks to avoid infinite loops with tiny niceStep
+        for (let v = niceMin; v <= niceMax + niceStep * 0.01 && ticks.length < 20; v = Math.round((v + niceStep) * 1e10) / 1e10) {
+            ticks.push(Math.round(v * 1e10) / 1e10);
+        }
+        return { min: niceMin, max: niceMax, ticks };
+    },
+
+    /* Format a tick label: compact for large numbers */
+    fmtTick(v) {
+        if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+        if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(Math.abs(v) >= 1e4 ? 0 : 1) + 'k';
+        if (Math.abs(v) % 1 !== 0) return v.toFixed(1);
+        return String(v);
+    },
+
+    /* Build x-axis date labels — smart: skip crowded labels */
+    buildXLabels(dates, by) {
+        return dates.map((d, i) => {
+            if (by === 'year') return d;
+            if (by === 'month') {
+                const parts = d.split('-');
+                // Jan always shown; others shown every N months depending on count
+                if (parts[1] === '01') return `${parts[1]}/${parts[0].slice(2)}`;
+                const step = dates.length <= 12 ? 1 : dates.length <= 24 ? 2 : 3;
+                return i % step === 0 ? parts[1] : '';
+            }
+            if (by === 'week') {
+                const step = dates.length <= 8 ? 1 : 2;
+                return i % step === 0 ? d.slice(5) : '';
+            }
+            // daily
+            const step = dates.length <= 14 ? 1 : Math.ceil(dates.length / 14);
+            return i % step === 0 ? d.slice(5) : '';
+        });
+    },
+
+    /* Compute descriptive stats for a data series */
+    seriesStats(data) {
+        const vals = data.map(d => d.y);
+        if (!vals.length) return null;
+        const sum = vals.reduce((a, b) => a + b, 0);
+        const avg = sum / vals.length;
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        // Standard deviation
+        const variance = vals.reduce((a, v) => a + Math.pow(v - avg, 2), 0) / vals.length;
+        const stdDev = Math.sqrt(variance);
+        const last = vals[vals.length - 1];
+        const first = vals[0];
+        const change = vals.length > 1 ? last - first : 0;
+        const changePct = Math.abs(first) > 0.01 ? (change / Math.abs(first)) * 100 : 0;
+        return { sum, avg, min, max, stdDev, last, first, change, changePct };
+    },
+
+    generate(transactions, args) {
+        const p = { by: 'month', type: 'line', filter: [], accounts: [], accumulate: false, forecast: false, abs: false };
+        args.forEach(a => {
+            const low = a.toLowerCase();
+            if (a.startsWith('by:')) p.by = a.substring(3);
+            else if (a.startsWith('type:')) p.type = a.substring(5);
+            else if (['cum', 'cumulative'].includes(low)) p.accumulate = true;
+            else if (a === 'forecast') p.forecast = true;
+            else if (low === 'abs') p.abs = true;
+            else if (a.startsWith('tag:') || a.startsWith('date:') || a.startsWith('desc:') || a.startsWith('amt:') || a.startsWith('acc:')) p.filter.push(a);
+            else {
+                const isAccount = isValidRoot(low) || ENGINE.accounts.some(acc => acc.toLowerCase().includes(low)) || fileAliases[low];
+                if (isAccount) p.accounts.push(a);
+                else p.filter.push(a);
+            }
+        });
+        if (p.accounts.length === 0) p.accounts.push('expenses');
+        const subset = transactions.filter(t => match(t, p.filter.join(' ')));
+        if (subset.length === 0) return '<div class="line warn">No matching transactions for graph.</div>';
+
+        // For expense/income accounts, default to absolute values for readability
+        const autoAbs = p.accounts.every(a => a.startsWith('expenses') || a.startsWith('income'));
+
+        const seriesList = p.accounts.map(acc => this.prepareSeries(subset, acc, p.by, p.accumulate, p.abs || autoAbs)).filter(Boolean);
+        if (!seriesList.length) return '<div class="line warn">No data for the selected accounts.</div>';
+
+        if (p.type === 'donut') return this.renderDonut(seriesList, p.by);
+        return this.renderSVG(seriesList, p.type, p.by, p.forecast);
+    },
+
+    prepareSeries(txns, accFilter, by, accumulate, useAbs) {
+        const buckets = {};
+        txns.forEach(t => {
+            let key = t.date;
+            if (by === 'month') key = t.date.slice(0, 7);
+            else if (by === 'year') key = t.date.slice(0, 4);
+            else if (by === 'week') {
+                // ISO week key: find Monday of the week
+                const d = new Date(t.date);
+                const dow = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0
+                const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
+                key = mon.toISOString().slice(0, 10);
+            }
+            let val = 0;
+            t.posts.forEach(p => { if (p.acc.toLowerCase().includes(accFilter.toLowerCase())) val += p.val; });
+            buckets[key] = (buckets[key] || 0) + val;
+        });
+
+        const sortedKeys = Object.keys(buckets).sort();
+        if (!sortedKeys.length) return null;
+
+        let running = 0;
+        const data = sortedKeys.map(k => {
+            let y = buckets[k];
+            if (useAbs) y = Math.abs(y);
+            if (accumulate) { running += y; y = running; }
+            // Decimal-safe round
+            y = Math.round((y + Number.EPSILON) * 100) / 100;
+            return { x: k, y };
+        });
+        return { name: accFilter, data };
+    },
+
+    renderSVG(seriesList, type, by, showForecast) {
+        const H = 290, W = 660;
+        const pad = { t: 28, r: 28, b: 44, l: 62 };
+        const drawW = W - pad.l - pad.r;
+        const drawH = H - pad.t - pad.b;
+
+        // Unified Y domain across all series
+        let allY = seriesList.flatMap(s => s.data.map(d => d.y));
+        if (showForecast) {
+            // add forecast projection points
+            seriesList.forEach(s => {
+                const trend = MathEngine.linearRegression(s.data);
+                if (trend) {
+                    const n = s.data.length;
+                    for (let i = 1; i <= 3; i++) allY.push(trend[n - 1]?.y + (trend[n-1]?.y - trend[n-2]?.y) * i || 0);
+                }
+            });
+        }
+        if (!allY.length) return '<div class="line warn">No data to render.</div>';
+
+        const scale = this.getNiceTicks(Math.min(...allY), Math.max(...allY));
+        const dates = seriesList[0].data.map(d => d.x);
+        const xLabels = this.buildXLabels(dates, by);
+
+        const getX = (i) => {
+            if (dates.length <= 1) return pad.l + drawW / 2;
+            return pad.l + (i / (dates.length - 1)) * drawW;
+        };
+        const getY = (v) => {
+            const range = scale.max - scale.min;
+            if (range === 0) return pad.t + drawH / 2;
+            return pad.t + drawH - ((v - scale.min) / range) * drawH;
+        };
+        const zeroY = getY(0);
+
+        // Defs: gradients
+        let defs = '<defs>';
+        seriesList.forEach((s, i) => {
+            const c = this.palette[i % this.palette.length];
+            defs += `<linearGradient id="g${i}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${c}" stop-opacity="0.45"/>
+                <stop offset="100%" stop-color="${c}" stop-opacity="0"/>
+            </linearGradient>`;
+        });
+        defs += '</defs>';
+
+        // Grid lines + Y-axis labels
+        let grid = `<line class="axis-line" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t + drawH}"/>`;
+        scale.ticks.forEach(t => {
+            const y = getY(t);
+            const isZero = Math.abs(t) < 1e-9;
+            grid += `<line ${isZero ? 'class="zero-line"' : 'class="grid-line"'} x1="${pad.l}" y1="${y.toFixed(1)}" x2="${W - pad.r}" y2="${y.toFixed(1)}"/>`;
+            grid += `<text x="${pad.l - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="${isZero ? 'var(--accent)' : 'var(--ghost)'}">${this.fmtTick(t)}</text>`;
+        });
+
+        // X-axis labels
+        let xAxis = '';
+        if (type !== 'scatter') {
+            xLabels.forEach((label, i) => {
+                if (!label) return;
+                let x = getX(i);
+                if (type === 'bar') {
+                    const slotW = drawW / dates.length;
+                    x = pad.l + i * slotW + slotW / 2;
+                }
+                xAxis += `<text class="x-label" x="${x.toFixed(1)}" y="${(H - pad.b + 14).toFixed(1)}" text-anchor="middle">${label}</text>`;
+            });
+        }
+
+        let paths = '', overlays = '';
+
+        seriesList.forEach((s, idx) => {
+            const color = this.palette[idx % this.palette.length];
+            const points = s.data.map((d, i) => [getX(i), getY(d.y)]);
+
+            if (type === 'bar') {
+                const slotW = drawW / dates.length;
+                const groupW = slotW * 0.75;
+                const barW = groupW / seriesList.length;
+                s.data.forEach((d, i) => {
+                    const cx = pad.l + i * slotW + slotW / 2;
+                    const x = cx - groupW / 2 + idx * barW;
+                    const barH = Math.abs(getY(d.y) - zeroY);
+                    const y = d.y >= 0 ? getY(d.y) : zeroY;
+                    const rx = Math.min(2, barW / 4);
+                    // Rounded top corners only
+                    if (barH > rx * 2) {
+                        paths += `<path d="M${x.toFixed(1)},${(y + rx).toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${(x+rx).toFixed(1)},${y.toFixed(1)} L${(x+barW-rx).toFixed(1)},${y.toFixed(1)} Q${(x+barW).toFixed(1)},${y.toFixed(1)} ${(x+barW).toFixed(1)},${(y+rx).toFixed(1)} L${(x+barW).toFixed(1)},${(y+barH).toFixed(1)} L${x.toFixed(1)},${(y+barH).toFixed(1)} Z" fill="${color}" opacity="0.82"/>`;
+                    } else if (barH > 0) {
+                        paths += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" opacity="0.82"/>`;
+                    }
+                    // Value label above/below bar (only if bar wide enough)
+                    if (barW > 20 && barH > 0) {
+                        const labelY = d.y >= 0 ? Math.max(pad.t + 10, y - 3) : y + barH + 10;
+                        paths += `<text x="${(x + barW/2).toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.9">${this.fmtTick(d.y)}</text>`;
+                    }
+                    overlays += `<rect class="hover-dot" data-idx="${i}" x="${x.toFixed(1)}" y="${pad.t}" width="${barW.toFixed(1)}" height="${drawH}" fill="${color}" rx="1" style="opacity:0" data-series-idx="${idx}"/>`;
+                });
+
+            } else if (type === 'scatter') {
+                s.data.forEach((d, i) => {
+                    const cx = getX(i), cy = getY(d.y);
+                    paths += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${color}" opacity="0.8"/>`;
+                });
+                const trend = MathEngine.linearRegression(s.data);
+                if (trend && trend.length >= 2) {
+                    const tp = trend.map((d, i) => `${getX(i).toFixed(1)},${getY(d.y).toFixed(1)}`).join(' ');
+                    paths += `<polyline points="${tp}" class="trend-line"/>`;
+                    // R² label
+                    const r2 = this.rSquared(s.data, trend);
+                    if (r2 !== null) {
+                        paths += `<text class="annotation" x="${W - pad.r - 2}" y="${pad.t + 12}" text-anchor="end">R²=${r2.toFixed(2)}</text>`;
+                    }
+                }
+                s.data.forEach((d, i) => {
+                    overlays += `<circle cx="${getX(i).toFixed(1)}" cy="${getY(d.y).toFixed(1)}" r="8" class="hover-dot" data-idx="${i}" fill="transparent"/>`;
+                });
+
+            } else {
+                // line / area
+                const dPath = this.catmullRom2bezier(points);
+                if (type === 'area' && points.length > 0) {
+                    const lastX = points[points.length - 1][0];
+                    const firstX = points[0][0];
+                    paths += `<path d="${dPath} L${lastX.toFixed(1)},${zeroY.toFixed(1)} L${firstX.toFixed(1)},${zeroY.toFixed(1)} Z" fill="url(#g${idx})" stroke="none"/>`;
+                }
+                paths += `<path d="${dPath}" class="chart-line" stroke="${color}" fill="none"/>`;
+
+                // Forecast extension: dashed
+                if (showForecast && s.data.length >= 3) {
+                    const trend = MathEngine.linearRegression(s.data);
+                    if (trend) {
+                        const lastI = s.data.length - 1;
+                        const lastX = getX(lastI);
+                        const lastY = getY(trend[lastI].y);
+                        const slope = (trend[lastI].y - trend[lastI - 1].y);
+                        const projPts = [
+                            [lastX, lastY],
+                            [lastX + drawW * 0.12, getY(trend[lastI].y + slope)],
+                            [lastX + drawW * 0.24, getY(trend[lastI].y + slope * 2)],
+                        ].map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+                        paths += `<polyline points="${projPts}" stroke="${color}" stroke-width="1.5" stroke-dasharray="5,3" fill="none" opacity="0.6"/>`;
+                    }
+                }
+
+                s.data.forEach((d, i) => {
+                    overlays += `<circle cx="${getX(i).toFixed(1)}" cy="${getY(d.y).toFixed(1)}" r="5" class="hover-dot" data-idx="${i}" stroke="${color}" fill="var(--panel)" stroke-width="2"/>`;
+                });
+            }
+        });
+
+        // Crosshair
+        const crosshair = `<line class="crosshair" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t + drawH}"/>`;
+
+        const containerId = `graph-${Date.now()}`;
+        // Encode meta safely — avoid JSON special chars in SVG attribute
+        const metaObj = {
+            dates, pad, W, H, type, by,
+            series: seriesList.map((s, i) => ({ name: s.name, color: this.palette[i % this.palette.length], data: s.data }))
+        };
+        const metaB64 = btoa(encodeURIComponent(JSON.stringify(metaObj)));
+
+        const svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" 
+            onmousemove="GraphEngine.hover(event,this)" 
+            ontouchmove="GraphEngine.hover(event,this,true)" 
+            onmouseleave="GraphEngine.leave(this)"
+            data-meta="${metaB64}">
+            ${defs}${grid}${xAxis}
+            <line class="axis-line" x1="${pad.l}" y1="${(pad.t+drawH).toFixed(1)}" x2="${W-pad.r}" y2="${(pad.t+drawH).toFixed(1)}"/>
+            ${paths}${crosshair}${overlays}
+        </svg>`;
+
+        const legend = seriesList.map((s, i) => {
+            const st = this.seriesStats(s.data);
+            const changeMark = st && Math.abs(st.changePct) > 1 ? `<span style="color:${st.changePct > 0 ? 'var(--success)' : 'var(--error)'}"> ${st.changePct > 0 ? '▲' : '▼'}${Math.abs(st.changePct).toFixed(0)}%</span>` : '';
+            return `<div class="legend-item"><div class="legend-dot" style="background:${this.palette[i%this.palette.length]}"></div><span>${escapeHtml(s.name)}${changeMark}</span></div>`;
+        }).join('');
+
+        // Stats panels (one per series, or combined if many)
+        let statsHtml = '';
+        seriesList.forEach((s, idx) => {
+            const st = this.seriesStats(s.data);
+            if (!st) return;
+            const c = this.palette[idx % this.palette.length];
+            statsHtml += `<div class="graph-stats" style="border-left:3px solid ${c};padding-left:6px;margin-top:6px">
+                <div class="graph-stat"><div class="graph-stat-label">Total</div><div class="graph-stat-val">${this.fmtTick(st.sum)}</div></div>
+                <div class="graph-stat"><div class="graph-stat-label">Avg/${by}</div><div class="graph-stat-val">${this.fmtTick(st.avg)}</div></div>
+                <div class="graph-stat"><div class="graph-stat-label">Max</div><div class="graph-stat-val" style="color:${st.max>0?'var(--success)':'var(--error)'}">${this.fmtTick(st.max)}</div></div>
+                <div class="graph-stat"><div class="graph-stat-label">Min</div><div class="graph-stat-val" style="color:${st.min<0?'var(--error)':'var(--text)'}">${this.fmtTick(st.min)}</div></div>
+            </div>`;
+        });
+
+        // Quick-switch type tabs
+        const allArgs = seriesList.map(s => s.name).join(' ');
+        const byPart = by !== 'month' ? ` by:${by}` : '';
+        const types = ['line','area','bar','scatter','donut'];
+        const tabs = types.map(t =>
+            `<button class="graph-tab${t===type?' active':''}" onclick="run('graph ${allArgs}${byPart} type:${t}')">${t}</button>`
+        ).join('');
+
+        return `<div class="graph-container" id="${containerId}">
+            <div class="graph-header">
+                <span>${type.toUpperCase()} · ${by} · ${dates.length} periods</span>
+                <div class="graph-type-tabs">${tabs}</div>
+            </div>
+            ${svg}
+            <div class="graph-legend" style="margin-top:8px">${legend}</div>
+            ${statsHtml}
+        </div>`;
+    },
+
+    /* R-squared: how well does the regression fit? */
+    rSquared(data, trend) {
+        if (!trend || data.length < 3) return null;
+        const yMean = data.reduce((a, d) => a + d.y, 0) / data.length;
+        const ssTot = data.reduce((a, d) => a + Math.pow(d.y - yMean, 2), 0);
+        if (ssTot < 1e-10) return null;
+        const ssRes = data.reduce((a, d, i) => a + Math.pow(d.y - trend[i].y, 2), 0);
+        return Math.max(0, 1 - ssRes / ssTot);
+    },
+
+    renderDonut(seriesList, by) {
+        // Aggregate per-account totals
+        const sums = seriesList.map((s, i) => ({
+            label: s.name,
+            val: Math.abs(s.data.reduce((a, b) => a + b.y, 0)),
+            color: this.palette[i % this.palette.length],
+            stats: this.seriesStats(s.data)
+        })).filter(s => s.val > 0).sort((a, b) => b.val - a.val);
+
+        if (!sums.length) return '<div class="line warn">No data for donut chart.</div>';
+
+        const total = sums.reduce((a, b) => a + b.val, 0);
+        if (total < 0.001) return '<div class="line warn">All values are zero.</div>';
+
+        const CX = 100, CY = 100, R = 78, r = 46;
+        let paths = '';
+        let startAngle = -Math.PI / 2; // start at top
+
+        sums.forEach((s, i) => {
+            const slice = (s.val / total) * Math.PI * 2;
+            const endAngle = startAngle + slice;
+            // Guard: full circle (single slice)
+            if (sums.length === 1) {
+                paths += `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${s.color}" stroke="var(--panel)" stroke-width="2"/>`;
+            } else {
+                const x1 = CX + R * Math.cos(startAngle);
+                const y1 = CY + R * Math.sin(startAngle);
+                const x2 = CX + R * Math.cos(endAngle);
+                const y2 = CY + R * Math.sin(endAngle);
+                const large = slice > Math.PI ? 1 : 0;
+                // Outer arc + inner arc (donut hole)
+                const xi1 = CX + r * Math.cos(startAngle);
+                const yi1 = CY + r * Math.sin(startAngle);
+                const xi2 = CX + r * Math.cos(endAngle);
+                const yi2 = CY + r * Math.sin(endAngle);
+                const d = `M${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} L${xi2.toFixed(2)},${yi2.toFixed(2)} A${r},${r} 0 ${large},0 ${xi1.toFixed(2)},${yi1.toFixed(2)} Z`;
+                paths += `<path d="${d}" fill="${s.color}" stroke="var(--panel)" stroke-width="2"/>`;
+            }
+            startAngle += slice;
+        });
+
+        // Center text
+        const centerLabel = total >= 1e6 ? (total / 1e6).toFixed(1) + 'M' : total >= 1e3 ? (total / 1e3).toFixed(1) + 'k' : total.toFixed(0);
+        const centerSvg = `<circle cx="${CX}" cy="${CY}" r="${r}" fill="var(--panel)"/>
+            <text x="${CX}" y="${CY - 6}" text-anchor="middle" font-size="10" fill="var(--accent)">TOTAL</text>
+            <text x="${CX}" y="${CY + 10}" text-anchor="middle" font-size="14" fill="var(--text)" font-weight="bold">${centerLabel}</text>`;
+
+        const legendItems = sums.map(s => {
+            const pct = (s.val / total * 100).toFixed(1);
+            return `<div class="legend-item" style="justify-content:space-between;width:100%;padding:3px 0;border-bottom:1px solid var(--panel)">
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div class="legend-dot" style="background:${s.color};width:8px;height:8px;border-radius:2px"></div>
+                    <span style="font-size:12px">${escapeHtml(s.label)}</span>
+                </div>
+                <span style="font-size:12px;color:${s.color};font-weight:bold">${pct}%&nbsp;<span style="color:var(--accent);font-weight:normal;font-size:11px">${this.fmtTick(s.val)}</span></span>
+            </div>`;
+        }).join('');
+
+        return `<div class="graph-container">
+            <div class="graph-header"><span>DISTRIBUTION — ${seriesList.length} accounts · ${by}</span></div>
+            <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+                <svg viewBox="0 0 200 200" width="160" height="160" style="flex-shrink:0">${paths}${centerSvg}</svg>
+                <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:0">${legendItems}</div>
+            </div>
+        </div>`;
+    },
+
+    hover(e, svg, isTouch) {
+        const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+        let meta;
+        try { meta = JSON.parse(decodeURIComponent(atob(svg.dataset.meta))); }
+        catch(err) { return; }
+
+        const rect = svg.getBoundingClientRect();
+        const scaleX = meta.W / rect.width;
+        const mx = (clientX - rect.left) * scaleX;
+        const drawW = meta.W - meta.pad.l - meta.pad.r;
+
+        let idx;
+        if (meta.type === 'bar') {
+            const slotW = drawW / meta.dates.length;
+            idx = Math.floor((mx - meta.pad.l) / slotW);
+        } else {
+            const ratio = (mx - meta.pad.l) / drawW;
+            idx = Math.round(ratio * (meta.dates.length - 1));
+        }
+        idx = Math.max(0, Math.min(idx, meta.dates.length - 1));
+
+        // Crosshair position
+        let cx;
+        if (meta.type === 'bar') {
+            const slotW = drawW / meta.dates.length;
+            cx = meta.pad.l + idx * slotW + slotW / 2;
+        } else {
+            cx = meta.pad.l + (meta.dates.length > 1 ? (idx / (meta.dates.length - 1)) * drawW : drawW / 2);
+        }
+        const ch = svg.querySelector('.crosshair');
+        if (ch) { ch.setAttribute('x1', cx.toFixed(1)); ch.setAttribute('x2', cx.toFixed(1)); ch.setAttribute('y1', meta.pad.t); ch.setAttribute('y2', (meta.H - meta.pad.b).toFixed(1)); ch.style.opacity = 1; }
+
+        // Hover dots
+        svg.querySelectorAll('.hover-dot').forEach(d => { 
+            d.style.opacity = 0; 
+            if (d.tagName === 'circle' && d.hasAttribute('r')) d.setAttribute('r', 5); 
+        });
+        svg.querySelectorAll(`.hover-dot[data-idx="${idx}"]`).forEach(d => { 
+            if (d.tagName === 'rect') { d.style.opacity = 0.08; } 
+            else { d.style.opacity = 1; if (d.hasAttribute('r')) d.setAttribute('r', 7); }
+        });
+
+        // Tooltip
+        const tt = document.getElementById('graph-tooltip');
+        tt.style.opacity = 1;
+        const ttW = 190, ttH = 130;
+        let tx = clientX + 14, ty = clientY - 10;
+        if (tx + ttW > window.innerWidth) tx = clientX - ttW - 8;
+        if (ty + ttH > window.innerHeight) ty = clientY - ttH - 8;
+        if (tx < 4) tx = 4;
+        if (ty < 4) ty = 4;
+        tt.style.left = tx + 'px'; tt.style.top = ty + 'px';
+
+        let html = `<div class="tt-head">${escapeHtml(meta.dates[idx])}</div>`;
+        meta.series.forEach(s => {
+            const v = s.data[idx]?.y;
+            if (v === undefined) return;
+            const prev = idx > 0 ? s.data[idx - 1]?.y : null;
+            let diff = '';
+            if (prev !== null && Math.abs(prev) > 0.01) {
+                const pct = ((v - prev) / Math.abs(prev) * 100);
+                diff = `<span style="color:${pct >= 0 ? 'var(--success)' : 'var(--error)'}"> ${pct >= 0 ? '▲' : '▼'}${Math.abs(pct).toFixed(1)}%</span>`;
+            }
+            html += `<div class="tt-row"><span style="color:${s.color}">● ${escapeHtml(s.name)}</span><span>${fmtNum(v)}${diff}</span></div>`;
+        });
+        tt.innerHTML = html;
+    },
+
+    leave(svg) {
+        const ch = svg.querySelector('.crosshair');
+        if (ch) ch.style.opacity = 0;
+        svg.querySelectorAll('.hover-dot').forEach(d => { d.style.opacity = 0; if (d.tagName === 'circle' && d.hasAttribute('r')) d.setAttribute('r', 5); });
+        const tt = document.getElementById('graph-tooltip');
+        if (tt) tt.style.opacity = 0;
+    }
+};
+
+/* =========================================
+   SMART PREDICTION ENGINE (THE ORACLE)
+   ========================================= */
+const ENGINE = {
+    grammar: {
+        'root': { next: ['cmd'] },
+        'dash':   { type: 'cmd', next: [], icon:'📊' },
+        'mount':   { type: 'cmd', next: [], icon:'💾' },
+        'remount': { type: 'cmd', next: [], icon:'🔗' },
+        'unmount': { type: 'cmd', next: [], icon:'⏏️' },
+        'undo':   { type: 'cmd', next: [], icon:'↩️' },
+        'clear':  { type: 'cmd', next: [], icon:'🧹' },
+        'help':   { type: 'cmd', next: [], icon:'❓' },
+        'check':  { type: 'cmd', next: [], icon:'✅' },
+        'stats':  { type: 'cmd', next: [], icon:'📈' },
+        'net':     { type: 'cmd', next: [], icon:'💰' },
+        'bal':    { type: 'cmd', next: ['acc', 'tag', 'date', 'amt_filter'], recursive: true, icon:'⚖️' },
+        'reg':    { type: 'cmd', next: ['acc', 'tag', 'date', 'amt_filter'], recursive: true, icon:'📜' },
+        'pnl':    { type: 'cmd', next: ['acc', 'tag', 'date'], recursive: true, icon:'💹' },
+        'coa':    { type: 'cmd', next: ['acc'], icon:'🌳' },
+        'graph':  { type: 'cmd', next: ['acc', 'tag', 'date', 'graph_opt'], recursive: true, icon:'📉' },
+        'recur':  { type: 'cmd', next: ['acc', 'desc'], icon:'🔄' },
+        'assert': { type: 'cmd', next: ['acc'], next2: ['amt'], icon:'⚖️' }, 
+        'commodity': { type: 'cmd', next: ['text'], icon:'💱' },
+        'buy':    { type: 'cmd', next: ['text'], icon:'🛒' },
+        'waterfall': { type: 'cmd', next: ['acc', 'date'], icon:'🌊' },
+        'rm':     { type: 'cmd', next: ['int'], icon:'🗑️' },
+        'pwa':     { type: 'cmd', next: ['sub_pwa'], icon: '🌐' },
+        'sub_pwa': { options: ['status', 'update'], next: [], icon: '⚡' },
+        'install': { type: 'cmd', next: [], icon: '📲' },
+        'account': { type: 'cmd', next: ['sub_acc'], icon:'👤' },
+        'sub_acc': { options: ['add'], next: ['text'], icon: '➕' },
+        'alias':   { type: 'cmd', next: ['sub_alias'], icon:'🏷️' },
+        'sub_alias': { options: ['add', 'list'], next: ['text'], icon: '🏷️' },
+        'add':     { type: 'cmd', next: [], icon:'➕' },
+        'export':  { type: 'cmd', next: ['sub_exp'], icon:'📤' },
+        'sub_exp': { options: ['copy', 'file', 'csv', 'json'], next: [], icon: '📄' },
+        'config': { type: 'cmd', next: ['sub_conf'], icon: '⚙️' },
+        'sub_conf': { branches: { 'theme': 'sub_theme', 'budget': 'sub_budget', 'set': 'sub_conf_set' }, options: ['list', 'strict'], next: [], icon: '🔧' },
+        'sub_theme': { options: ['matrix', 'dracula', 'paper', 'solarized', 'catppuccin', 'nord', 'monokai', 'default', 'reset', 'font', 'bg', 'text'], next: ['text'], icon: '🎨' },
+        'sub_budget': { options: ['set', 'rm', 'list'], next: ['acc'], icon: '💰' },
+        'sub_conf_set': { next: ['text'], icon: '✏️' },
+        'ledger': { type: 'cmd', next: ['sub_ledg'], icon: '📚' },
+        'sub_ledg': { options: ['import', 'merge', 'reset', 'list', 'switch'], next: ['text'], icon: '📂' },
+        'tutorial': { type: 'cmd', next: ['sub_tut'], icon: '🎓' },
+        'sub_tut': { options: ['basics', 'tips', 'backup', 'command'], next: [], icon: '📖' },
+        'search':  { type: 'cmd', next: ['desc'], recursive: true, icon: '🔍' },
+        'recent':  { type: 'cmd', next: ['int'], icon: '⏱️' },
+        'trend':   { type: 'cmd', next: ['acc'], icon: '📐' },
+        'forecast':{ type: 'cmd', next: ['int'], icon: '🔮' },
+        'history': { type: 'cmd', next: [], icon: '📋' },
+        'tags':    { type: 'cmd', next: [], icon: '🏷️' },
+        'accounts':{ type: 'cmd', next: ['acc'], icon: '📒' },
+        'backup':  { type: 'cmd', next: ['sub_backup'], icon: '💾' },
+        'sub_backup': { options: ['now', 'list'], next: [], icon: '🗂️' },
+    },
+    memory: JSON.parse(localStorage.getItem('HL_BRAIN') || '{}'),
+    accounts: [], 
+    saveMemory() {
+        if (Math.random() > 0.95) {
+            Object.keys(this.memory).forEach(k => {
+                this.memory[k] = Math.floor(this.memory[k] * 0.9);
+                if (this.memory[k] <= 0) delete this.memory[k];
+            });
+        }
+        localStorage.setItem('HL_BRAIN', JSON.stringify(this.memory));
+    },
+    learn(inputString) {
+        if (!inputString) return;
+        const tokens = inputString.trim().toLowerCase().split(/\s+/);
+        tokens.forEach(t => { const key = `uni|${t}`; this.memory[key] = (this.memory[key] || 0) + 1; });
+        for (let i = 0; i < tokens.length - 1; i++) {
+            const t1 = tokens[i]; const t2 = tokens[i+1];
+            if (/^\d/.test(t2) && !t2.match(/^\d{4}-\d{2}/)) continue; 
+            const key = `bi|${t1}|${t2}`; this.memory[key] = (this.memory[key] || 0) + 2; 
+        }
+        this.saveMemory();
+    },
+    predict(inputString) {
+        const raw = inputString.toLowerCase(); const endsInSpace = inputString.endsWith(' '); const tokens = raw.trim().split(/\s+/);
+        if (!raw || (tokens.length === 1 && !endsInSpace)) { return this.scoreCandidates(this.getCandidates(['cmd']), 'root', raw.trim()); }
+        let currentNode = this.grammar[tokens[0]];
+        if (!currentNode) return { suggest: '', options: [] };
+        let currentNextTypes = currentNode.next || [];
+        const limit = endsInSpace ? tokens.length : tokens.length - 1;
+        for (let i = 1; i < limit; i++) {
+            const t = tokens[i];
+            const subNodeName = currentNextTypes.find(type => type.startsWith('sub_'));
+            if (subNodeName) {
+                 const subNode = this.grammar[subNodeName];
+                 if (subNode) {
+                     if (subNode.branches && subNode.branches[t]) { const nextNodeId = subNode.branches[t]; const nextNode = this.grammar[nextNodeId]; currentNextTypes = nextNode ? [nextNodeId] : []; continue; }
+                     if (subNode.options && subNode.options.includes(t)) { currentNextTypes = subNode.next || []; continue; }
+                 }
+            }
+            if (currentNode.next2 && i === 1) { currentNextTypes = currentNode.next2; } else if (!currentNode.recursive && !subNodeName) { currentNextTypes = []; }
+        }
+        const prevToken = endsInSpace ? tokens[tokens.length - 1] : tokens[tokens.length - 2];
+        const partial = endsInSpace ? '' : tokens[tokens.length - 1];
+        let candidates = [];
+        currentNextTypes.forEach(type => {
+            if (this.grammar[type]) { const node = this.grammar[type]; if (node.branches) candidates.push(...this.wrapOptions(Object.keys(node.branches), node.icon)); if (node.options) candidates.push(...this.wrapOptions(node.options, node.icon)); }
+            else {
+                if (type === 'acc') candidates.push(...this.getAccountCandidates());
+                if (type === 'date') candidates.push(...this.getDateCandidates());
+                if (type === 'graph_opt') candidates.push(...this.getGraphCandidates());
+                if (type === 'amt_filter') candidates.push(...[{text:'amt:>', type:'opt', icon:'💰'}, {text:'amt:<', type:'opt', icon:'💰'}]);
+                if (type === 'tag') candidates.push(...this.getTagCandidates());
+                if (type === 'desc') candidates.push({text:'Description...', type:'text', icon:'✎'});
+                if (type === 'amt') candidates.push({text:'0.00', type:'text', icon:'🔢'});
+                // Always suggest known commodities alongside accounts/params
+                if (type === 'acc' || type === 'param') candidates.push(...this.getCommodityCandidates());
+            }
+        });
+        return this.scoreCandidates(candidates, prevToken, partial);
+    },
+    wrapOptions(list, icon) { return list.map(t => ({ text: t, type: 'opt', icon: icon })); },
+    getAccountCandidates() {
+        // Aliases: insert the RESOLVED account (not the alias keyword), but display "alias → account"
+        const aliases = Object.entries(fileAliases).map(([alias, resolved]) => ({
+            text: resolved,           // insert the real account
+            display: `${alias} → ${resolved}`,  // show what it maps to
+            type: 'acc',
+            icon: '🏷️'
+        }));
+        const accs = this.accounts.map(a => ({ text: a, display: a, type: 'acc', icon: '👤' }));
+        return [...aliases, ...accs];
+    },
+    getDateCandidates() { 
+        const now = new Date();
+        const y = now.getFullYear();
+        return [
+            {text:'today',type:'date',icon:'📅'},
+            {text:'yesterday',type:'date',icon:'📅'},
+            {text:'thisweek',type:'date',icon:'📅'},
+            {text:'lastweek',type:'date',icon:'📅'},
+            {text:'thismonth',type:'date',icon:'📅'},
+            {text:'lastmonth',type:'date',icon:'📅'},
+            {text:'thisyear',type:'date',icon:'📅'},
+            {text:'lastyear',type:'date',icon:'📅'},
+            {text:'q1',type:'date',icon:'📅'},
+            {text:'q2',type:'date',icon:'📅'},
+            {text:'q3',type:'date',icon:'📅'},
+            {text:'q4',type:'date',icon:'📅'},
+            {text:`${y}-01`,type:'date',icon:'📅'},
+            {text:`${y}-02`,type:'date',icon:'📅'},
+        ];
+    },
+    getGraphCandidates() { return [
+        {text:'type:bar',type:'opt',icon:'📊'},
+        {text:'type:line',type:'opt',icon:'📉'},
+        {text:'type:area',type:'opt',icon:'🏔'},
+        {text:'type:donut',type:'opt',icon:'🍩'},
+        {text:'type:scatter',type:'opt',icon:'✦'},
+        {text:'cum',type:'opt',icon:'➕'},
+        {text:'abs',type:'opt',icon:'±'},
+        {text:'by:month',type:'opt',icon:'📅'},
+        {text:'by:week',type:'opt',icon:'📅'},
+        {text:'by:year',type:'opt',icon:'📅'},
+        {text:'by:day',type:'opt',icon:'📅'},
+        {text:'forecast',type:'opt',icon:'🔮'},
+    ]; },
+    getTagCandidates() { return Array.from(availableTags).map(t => ({text: t, type:'tag', icon:'🏷️'})); },
+    getCommodityCandidates() { return Array.from(availableCommodities).map(c => ({text: c, display: c, type:'comm', icon:'💱'})); },
+    getCandidates(types) { let res = []; types.forEach(t => { if (t === 'cmd') res.push(...Object.keys(this.grammar).filter(k => this.grammar[k].type === 'cmd').map(k => ({ text: k, type: 'cmd', icon: this.grammar[k].icon }))); }); return res; },
+    scoreCandidates(candidates, prevToken, partial) {
+        const pLower = partial.toLowerCase();
+        const scored = candidates.map(c => {
+            let score = 0; const tLower = c.text.toLowerCase();
+            if (pLower && !tLower.includes(pLower)) return null;
+            if (pLower && tLower.startsWith(pLower)) score += 100;
+            const biKey = `bi|${prevToken}|${tLower}`; if (this.memory[biKey]) score += (this.memory[biKey] * 5);
+            const uniKey = `uni|${tLower}`; if (this.memory[uniKey]) score += (this.memory[uniKey] * 1);
+            return { ...c, score };
+        }).filter(c => c !== null);
+        scored.sort((a,b) => b.score - a.score || a.text.localeCompare(b.text));
+        const top = scored.slice(0, 15);
+        // For autocomplete ghost text, use the text (not display) to match what gets inserted
+        const suggest = (top.length > 0 && partial && top[0].text.startsWith(partial)) ? top[0].text.substring(partial.length) : '';
+        return { suggest, options: top };
+    }
+};
+
+/* =========================================
+   HLEDGER STRICT LINTER (CLI COMPLIANCE)
+   ========================================= */
+const HledgerLinter = {
+    validate(text) {
+        const lines = text.split('\n');
+        const errors = [];
+        let currentBlock = [];
+        for (let i = 0; i <= lines.length; i++) {
+            const line = lines[i];
+            const isEmpty = line === undefined || line.trim() === '';
+            if (!isEmpty) { currentBlock.push({ text: line, index: i + 1 }); }
+            else if (currentBlock.length > 0) { this.validateBlock(currentBlock, errors); currentBlock = []; }
+        }
+        return { valid: errors.length === 0, errors };
+    },
+    validateBlock(lines, errors) {
+        const rawHeader = lines[0].text;
+        // Skip non-transaction blocks: comments, directives
+        if (/^[;#%]/.test(rawHeader)) return;
+        if (/^(account|alias|commodity|include|P |D |Y |apply|end apply|~)/.test(rawHeader)) return;
+        if (/^\s/.test(rawHeader)) { errors.push(`Transaction header must not be indented.`); return; }
+        // Date: YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD, optional =secondary
+        if (!/^(\d{4}[-./]\d{1,2}[-./]\d{1,2})/.test(rawHeader)) {
+            errors.push(`Invalid date — use YYYY-MM-DD.`); return;
+        }
+        // Header must have description (after date/flag/code)
+        const hm = rawHeader.match(/^(\d{4}[-./]\d{2}[-./]\d{2})(?:=\d{4}[-./]\d{2}[-./]\d{2})?\s*[!*]?\s*(?:\([^)]*\)\s*)?(.*?)\s*(;.*)?$/);
+        if (hm && !hm[2]?.trim()) { errors.push(`Transaction missing description.`); }
+
+        // Filter postings: skip pure comment lines, keep indented account lines
+        const postings = lines.slice(1).filter(p => {
+            const t = p.text.trim();
+            return t !== '' && !/^[;#%]/.test(t);
+        });
+
+        if (postings.length < 2) {
+            errors.push(`Need at least 2 postings (found ${postings.length}).`); return;
+        }
+
+        // Check for account on one line, amount on the next (spec violation)
+        for (let i = 0; i < postings.length - 1; i++) {
+            const txt = postings[i].text;
+            const nextTxt = postings[i + 1].text;
+            const isAccountOnly = /^\s+[\p{L}\p{N}_()\[\]"':.-]+\s*$/u.test(txt);
+            const isBarePocket  = /^\s+[-\d$€£¥₺]/u.test(nextTxt);
+            if (isAccountOnly && isBarePocket) {
+                const acc = txt.trim();
+                errors.push(`"${acc}" and its amount must be on the same line. Use:  ${acc}  <amount>`);
+                return;
+            }
+        }
+
+        // Validate each posting
+        let implicitCount = 0;
+        const commSums = {}; // per-commodity sum for balance check
+        for (const p of postings) {
+            const txt = p.text;
+            if (!/^\s/.test(txt)) { errors.push(`Posting must be indented: "${txt.trim().substring(0, 30)}"`); continue; }
+
+            // Parse: indent + account + optional 2-space gap + amount
+            // Account may be virtual: (Account) or [Account]
+            const parts = txt.match(ACC_RE.posting);
+            if (!parts) { errors.push(`Invalid posting: "${txt.trim().substring(0, 40)}"`); continue; }
+
+            // parts[1]=indent, parts[2]=account, parts[3]=amount
+            const rawAmt = parts[3] ? parts[3].split(';')[0].trim() : '';
+            if (rawAmt === '') {
+                implicitCount++;
+            } else {
+                // Reject thousand-separator commas: 1,000 (not 1.000,50 European style)
+                if (/\d,\d{3}(?!\d)/.test(rawAmt) && !/,\d{1,2}$/.test(rawAmt)) {
+                    errors.push(`Remove thousand separators: "${rawAmt}" → "${rawAmt.replace(/,/g,'')}"`);
+                }
+                const amtParts = parseCommodity(rawAmt);
+                if (isNaN(amtParts.val)) {
+                    errors.push(`Invalid amount: "${rawAmt}"`);
+                } else {
+                    // Virtual postings (balanced) count toward their own sum
+                    // Unbalanced virtual [] are excluded from balance check
+                    if (!/^\[/.test(parts[2])) {
+                        const c = amtParts.comm || '__default__';
+                        commSums[c] = (commSums[c] || 0) + amtParts.val;
+                    }
+                }
+            }
+        }
+
+        if (implicitCount > 1) {
+            errors.push(`${implicitCount} postings lack amounts — only 1 may be left blank for auto-balance.`);
+        }
+        // Balance check: each commodity must sum to 0 (or one implicit posting absorbs it)
+        if (implicitCount === 0) {
+            Object.entries(commSums).forEach(([c, sum]) => {
+                if (Math.abs(sum) > 0.001) {
+                    const label = c === '__default__' ? '' : ' ' + c;
+                    errors.push(`Not balanced — off by ${fmtNum(sum)}${label}. Leave one posting blank to auto-balance.`);
+                }
+            });
+        }
+    }
+};
+
+/* =========================================
+   STRICT APPEND-ONLY EDITOR
+   ========================================= */
+const Editor = {
+    suggestions: [],
+
+    /* ── open([prefillDesc]) ─────────────────────────────────────────── */
+    open(prefillDesc) {
+        const historyDiv = document.getElementById('editor-history');
+        const activeArea = document.getElementById('active-editor');
+
+        // 1. Load history with syntax highlighting (read-only pane)
+        const raw = LedgerManager.getRaw();
+        historyDiv.innerHTML = raw.split('\n').map(line => {
+            const esc = escapeHtml(line);
+            if (!line.trim()) return '<span>\n</span>';
+            if (line.match(/^;/) || line.match(/^\s+;/)) return `<span class="hl-comment">${esc}\n</span>`;
+            if (line.match(/^(account|alias|include|P )/)) return `<span class="hl-directive">${esc}\n</span>`;
+            if (line.match(/^\d{4}[-/.]\d{2}[-/.]\d{2}/)) {
+                return `<span class="hl-date">${esc}\n</span>`;
+            }
+            if (line.match(/^\s+/)) {
+                // posting line — highlight amount if present using Unicode-safe regex
+                const postMatch = line.match(ACC_RE.withGap);
+                if (postMatch) {
+                    const indent = escapeHtml(postMatch[1]);
+                    const acc = escapeHtml(postMatch[2]);
+                    const gap = escapeHtml(postMatch[3]);
+                    const amtRaw = postMatch[4];
+                    const amtVal = parseCommodity(amtRaw.split(';')[0].trim()).val;
+                    const amtCls = amtVal < 0 ? 'hl-amount neg' : 'hl-amount';
+                    return `<span>${indent}<span class="hl-account">${acc}</span>${gap}<span class="${amtCls}">${escapeHtml(amtRaw)}</span>\n</span>`;
+                }
+                return `<span class="hl-account">${esc}\n</span>`;
+            }
+            return `<span>${esc}\n</span>`;
+        }).join('');
+        historyDiv.scrollTop = historyDiv.scrollHeight;
+
+        // 2. Seed the active entry
+        const today = new Date().toISOString().split('T')[0];
+        activeArea.value = prefillDesc
+            ? `${today} ${prefillDesc}`
+            : `${today} `;
+
+        // 3. Wire events — oninput fires on every character change (paste, IME, etc.)
+        activeArea.onkeydown = (e) => this.handleKey(e);
+        activeArea.oninput   = () => this.analyze();   // covers typing, paste, undo
+        activeArea.onclick   = () => this.analyze();   // covers cursor moves via mouse
+
+        document.getElementById('editor-modal').classList.add('open');
+
+        // Focus + caret to end + first chip render
+        setTimeout(() => {
+            activeArea.focus();
+            activeArea.setSelectionRange(activeArea.value.length, activeArea.value.length);
+            this.analyze();
+        }, 100);
+    },
+
+    /* ── save() ──────────────────────────────────────────────────────── */
+    save() {
+        const activeArea = document.getElementById('active-editor');
+        const status = document.getElementById('editor-status');
+
+        // Strip trailing blank/indent-only lines
+        const rawLines = activeArea.value.split('\n');
+        let lastReal = rawLines.length - 1;
+        while (lastReal > 0 && rawLines[lastReal].trim() === '') lastReal--;
+
+        // Normalize: if a posting has account on one line and bare amount on next, merge them
+        const normalized = [];
+        for (let i = 0; i <= lastReal; i++) {
+            const line = rawLines[i];
+            const nextLine = rawLines[i + 1];
+            const isPostingOnly = ACC_RE.postingOnly.test(line);           // Unicode-safe
+            const isBarePocket  = nextLine && /^\s{4}[-\d$€£¥₺]/.test(nextLine);
+            if (isPostingOnly && isBarePocket && i < lastReal) {
+                const m = line.match(ACC_RE.postingOnly);
+                const acc = m ? m[2].trim() : line.trim();
+                normalized.push(`    ${acc}  ${rawLines[i + 1].trim()}`);
+                i++;
+            } else {
+                normalized.push(line);
+            }
+        }
+        const trimmedTxt = normalized.join('\n');
+
+        // Must have at least a date line + 2 postings
+        if (trimmedTxt.split('\n').filter(l => l.trim()).length < 3) {
+            status.innerHTML = `<span style='color:var(--error)'>Need: date line + at least 2 postings</span>`;
+            return;
+        }
+
+        // Count implicit postings (Unicode-safe)
+        const postingLinesList = trimmedTxt.split('\n').filter(l => isPostingLine(l));
+        const implicitInEntry  = postingLinesList.filter(l => !ACC_RE.withGap.test(l)).length;
+        if (implicitInEntry > 1) {
+            const firstImplicit = postingLinesList.find(l => !ACC_RE.withGap.test(l));
+            const acc = accFromLine(firstImplicit || '') || '?';
+            status.innerHTML = `<span style='color:var(--error)'>✗ "${escapeHtml(acc)}" needs an amount — only 1 may be blank</span>`;
+            status.classList.remove('shake'); void status.offsetWidth; status.classList.add('shake');
+            return;
+        }
+
+        const result = HledgerLinter.validate(trimmedTxt);
+        if (!result.valid) {
+            status.innerHTML = `<span style='color:var(--error)'>✗ ${escapeHtml(result.errors[0])}</span>`;
+            status.classList.remove('shake'); void status.offsetWidth; status.classList.add('shake');
+            return;
+        }
+
+        // ── STRICT MODE: detect undeclared accounts, offer to add them ──
+        if (SETTINGS.strictMode) {
+            const knownAccounts = new Set([...Array.from(allowedAccounts), ...ENGINE.accounts]);
+            const undeclared = [];
+            postingLinesList.forEach(l => {
+                const acc = accFromLine(l);
+                if (!acc) return;
+                const clean = acc.replace(/^[([]+|[)\]]+$/g, '');
+                if (!clean) return;
+                const known = knownAccounts.has(clean) ||
+                    Array.from(knownAccounts).some(k => clean.startsWith(k + ':') || k.startsWith(clean + ':'));
+                if (!known && !undeclared.includes(clean)) undeclared.push(clean);
+            });
+            if (undeclared.length > 0) {
+                this._promptNewAccounts(undeclared, trimmedTxt, status);
+                return;
+            }
+        }
+
+        this._doSave(trimmedTxt);
+    },
+
+    /* ── Strict-mode inline prompt (no browser confirm()) ─────────────── */
+    _pendingSave: null,
+    _newAccountsPending: null,
+
+    _promptNewAccounts(newAccounts, trimmedTxt, status) {
+        this._pendingSave = trimmedTxt;
+        this._newAccountsPending = newAccounts;
+        const list = newAccounts.map(a => `<b>${escapeHtml(a)}</b>`).join(', ');
+        const suggs = document.getElementById('editor-suggestions');
+        suggs.innerHTML = `
+            <span style="color:var(--warn);font-size:11px;flex-shrink:0;white-space:nowrap">
+                ⚠ Unknown: ${list}
+            </span>
+            <div class="chip math" style="flex-shrink:0" onmousedown="event.preventDefault()"
+                onclick="Editor._confirmNewAccounts()">✓ Add &amp; Save</div>
+            <div class="chip" style="flex-shrink:0" onmousedown="event.preventDefault()"
+                onclick="Editor._skipNewAccounts()">Save anyway</div>
+            <div class="chip" style="flex-shrink:0;color:var(--error);border-color:var(--error)"
+                onmousedown="event.preventDefault()" onclick="Editor._cancelNewAccounts()">Cancel</div>
+        `;
+        status.innerHTML = `<span style='color:var(--warn)'>⚠ ${newAccounts.length} undeclared account${newAccounts.length !== 1 ? 's' : ''}</span>`;
+    },
+
+    _confirmNewAccounts() {
+        if (!this._newAccountsPending) return;
+        this._newAccountsPending.forEach(acc => {
+            if (!allowedAccounts.has(acc)) {
+                directiveLines.push(`account ${acc}`);
+                allowedAccounts.add(acc);
+            }
+        });
+        const rawAfter = reconstructFile();
+        LedgerManager.saveLocal(rawAfter);
+        parseData(rawAfter);
+        this._newAccountsPending = null;
+        document.getElementById('editor-suggestions').innerHTML = '';
+        if (this._pendingSave) this._doSave(this._pendingSave);
+    },
+
+    _skipNewAccounts() {
+        this._newAccountsPending = null;
+        document.getElementById('editor-suggestions').innerHTML = '';
+        if (this._pendingSave) this._doSave(this._pendingSave);
+    },
+
+    _cancelNewAccounts() {
+        this._pendingSave = null;
+        this._newAccountsPending = null;
+        document.getElementById('editor-suggestions').innerHTML = '';
+        document.getElementById('editor-status').innerHTML = `<span style='color:var(--accent)'>Cancelled</span>`;
+        document.getElementById('active-editor').focus();
+    },
+
+    /* ── _doSave() — commit the validated, approved entry ───────────── */
+    _doSave(trimmedTxt) {
+        const status = document.getElementById('editor-status');
+        const currentRaw = LedgerManager.getRaw();
+        const prefix = currentRaw.trim().length > 0 ? "\n\n" : "";
+        const finalContent = currentRaw.trim() + prefix + trimmedTxt;
+
+        LedgerManager.save(finalContent);
+        LedgerManager.loadRaw(finalContent);
+
+        // Teach the Oracle (Unicode-safe)
+        trimmedTxt.split('\n').forEach(l => {
+            if (!isPostingLine(l)) return;
+            const acc = accFromLine(l);
+            if (acc) ENGINE.learn(acc.replace(/^[([]+|[)\]]+$/g, ''));
+        });
+
+        status.innerHTML = `<span style='color:var(--success)'>✓ Saved</span>`;
+        log('Transaction added.', 'success');
+        ConfigManager.incTxnCount();
+        ConfigManager.checkBackup();
+        setTimeout(() => this.close(), 300);
+    },
+
+    close() {
+        document.getElementById('editor-modal').classList.remove('open');
+        document.getElementById('editor-suggestions').innerHTML = '';
+        // Clear any pending state
+        this._pendingSave = null;
+        this._newAccountsPending = null;
+    },
+
+    /* ── handleKey() ─────────────────────────────────────────────────── */
+    handleKey(e) {
+        const editor = e.target;
+        const val    = editor.value;
+        const start  = editor.selectionStart;
+        const end    = editor.selectionEnd;
+
+        const lineStart   = val.lastIndexOf('\n', start - 1) + 1;
+        const lineContent = val.substring(lineStart, start);
+        const nlPos       = val.indexOf('\n', start);
+        const lineEndPos  = nlPos === -1 ? val.length : nlPos;
+        const fullLine    = val.substring(lineStart, lineEndPos);
+        const isHeader    = val.lastIndexOf('\n', lineStart - 1) === -1 && lineStart === 0;
+        const isPostingLine = !isHeader && lineContent.length >= 4;
+
+        // TAB → accept top chip or ghost suffix
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            // If ghost suffix is set and cursor is at end of an account word, accept it
+            if (this._ghostSuffix && this.suggestions.length > 0) {
+                this.insert(this.suggestions[0].text);
+            } else if (this.suggestions.length > 0) {
+                this.insert(this.suggestions[0].text);
+            }
+            return;
+        }
+
+        // SPACE on a posting line after a complete account name
+        // → jump straight to amount position (insert double-space, move cursor there)
+        if (e.key === ' ' && isPostingLine) {
+            const afterIndent = lineContent.replace(/^\s+/, '');
+            const hasAccount  = afterIndent.length > 0 && ACC_RE.isPosting.test('    ' + afterIndent);
+            const alreadyHasGap = /\s{2,}/.test(fullLine.replace(/^\s+/, ''));
+            if (hasAccount && !alreadyHasGap) {
+                e.preventDefault();
+                // Place cursor at amount position: end of account + double space (Unicode-safe)
+                const accEndPos  = lineStart + accountEndIdx(fullLine);
+                const newVal     = val.slice(0, accEndPos) + '  ' + val.slice(lineEndPos);
+                editor.value     = newVal;
+                editor.selectionStart = editor.selectionEnd = accEndPos + 2;
+                this.analyze();
+                return;
+            }
+        }
+
+        // ENTER → enforce hledger indentation
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const isOnlySpaces   = fullLine.trim() === '';
+            const isOnHeaderLine = val.lastIndexOf('\n', lineStart - 1) === -1;
+            if (isOnlySpaces && !isOnHeaderLine) {
+                // Empty posting line — collapse to plain newline (end of transaction)
+                const newVal = val.slice(0, lineStart) + '\n' + val.slice(end);
+                editor.value = newVal;
+                editor.selectionStart = editor.selectionEnd = lineStart + 1;
+                this.analyze();
+            } else if (!isOnHeaderLine && !isOnlySpaces) {
+                // Posting line with content — check if it has account but no amount yet
+                const afterIndent = fullLine.replace(/^\s+/, '');
+                const hasAmount = /\s{2,}/.test(afterIndent); // double-space separator = has amount
+                if (!hasAmount && afterIndent.length > 0) {
+                    // Account typed but no amount — nudge user to add amount on same line
+                    const accEndPos = lineStart + accountEndIdx(fullLine);    // Unicode-safe
+                    const newVal = val.slice(0, accEndPos) + '  ' + val.slice(lineEndPos);
+                    editor.value = newVal;
+                    editor.selectionStart = editor.selectionEnd = accEndPos + 2;
+                    this.analyze();
+                } else {
+                    this.insertAtCursor(editor, '\n    ');
+                }
+            } else {
+                this.insertAtCursor(editor, '\n    ');
+            }
+            return;
+        }
+
+        // BACKSPACE on the double-space gap — jump back to account context
+        if (e.key === 'Backspace' && isPostingLine && start === end) {
+            const afterIndent = lineContent.replace(/^\s+/, '');
+            const alreadyHasGap = /\s{2,}/.test(fullLine.replace(/^\s+/, ''));
+            // If cursor is right at the start of the amount (just after the gap), eat both spaces
+            if (alreadyHasGap && !afterIndent.includes('  ') && afterIndent === '') {
+                // cursor is between indent and gap — let default backspace handle it
+            } else if (lineContent.endsWith('  ') && !afterIndent.replace(/\s+$/, '').includes(' ')) {
+                e.preventDefault();
+                // Remove both spaces so we're back to account-only
+                const newVal = val.slice(0, start - 2) + val.slice(start);
+                editor.value = newVal;
+                editor.selectionStart = editor.selectionEnd = start - 2;
+                this.analyze();
+                return;
+            }
+        }
+    },
+
+    insertAtCursor(textarea, text) {
+        const s = textarea.selectionStart, e = textarea.selectionEnd;
+        textarea.value = textarea.value.slice(0, s) + text + textarea.value.slice(e);
+        textarea.selectionStart = textarea.selectionEnd = s + text.length;
+        textarea.dispatchEvent(new Event('input'));
+    },
+
+    /* ── analyze() ───────────────────────────────────────────────────── */
+    analyze() {
+        const editor = document.getElementById('active-editor');
+        const text   = editor.value;
+        const pos    = editor.selectionStart;
+
+        const lineStart   = text.lastIndexOf('\n', pos - 1) + 1;
+        const lineContent = text.substring(lineStart, pos);
+        const nlPos       = text.indexOf('\n', pos);
+        const fullLine    = text.substring(lineStart, nlPos === -1 ? text.length : nlPos);
+
+        // Scan all posting lines in entry: collect explicit amounts and implicit (no-amount) postings
+        let explicitSum = 0;
+        let explicitCount = 0;
+        let implicitCount = 0;
+        const postingLines = [];
+        text.split('\n').forEach((l) => {
+            if (!isPostingLine(l)) return;          // Unicode-safe
+            const m = l.match(ACC_RE.posting);      // [1]=indent, [2]=account, [3]=amount
+            if (m && m[3]) {
+                const p = parseCommodity(m[3].split(';')[0].trim());
+                if (!isNaN(p.val) && !/^\[/.test(m[2])) {
+                    explicitSum += p.val;
+                    explicitCount++;
+                }
+                postingLines.push({ line: l, acc: m[2], hasAmount: true });
+            } else {
+                implicitCount++;
+                const acc = m ? m[2] : (accFromLine(l) || '');
+                postingLines.push({ line: l, acc, hasAmount: false });
+            }
+        });
+        const currentBal = explicitSum;
+
+        const status = document.getElementById('editor-status');
+
+        // isHeader: cursor is on the very first line of the entry
+        const isFirstLine = text.lastIndexOf('\n', lineStart - 1) === -1;
+
+        let context = '';
+        if (isFirstLine) {
+            context = 'header';
+            status.innerHTML = `<span style='color:var(--accent)'>HEADER</span>`;
+
+        } else if (lineContent.trim() === '' && lineContent.length < 4) {
+            context = 'account';
+            status.innerHTML = `<span style='color:var(--ghost)'>↵ indent auto</span>`;
+
+        } else if (lineContent.length < 4 && lineContent.trim().length > 0) {
+            context = '';
+            status.innerHTML = '<span style="color:var(--error)">⚠ 4-space indent required</span>';
+
+        } else if (/\s{2,}/.test(fullLine.replace(/^\s+/, ''))) {
+            // Cursor is in the amount column
+            context = 'amount';
+            if (implicitCount >= 1 && explicitCount >= 1) {
+                status.innerHTML = Math.abs(currentBal) < 0.001
+                    ? "<span style='color:var(--success)'>✓ BALANCED</span>"
+                    : `<span style='color:var(--warn)'>auto-bal: ${fmtNum(-currentBal)}</span>`;
+            } else if (implicitCount === 0 && explicitCount >= 2) {
+                status.innerHTML = Math.abs(currentBal) < 0.001
+                    ? "<span style='color:var(--success)'>✓ BALANCED</span>"
+                    : `<span style='color:var(--error)'>off by ${fmtNum(-currentBal)}</span>`;
+            } else {
+                status.innerHTML = `<span style='color:var(--accent)'>AMOUNT</span>`;
+            }
+
+        } else {
+            // Account context — Unicode-safe detection
+            context = 'account';
+            const totalPostings = postingLines.length;
+            const currentAcc = accFromLine(fullLine);
+            const currentLineHasAccount = !!currentAcc && fullLine.trim().length > 0;
+            const currentLineHasNoAmount = currentLineHasAccount && !/\s{2,}/.test(fullLine.replace(/^\s+/, ''));
+
+            if (implicitCount >= 2) {
+                status.innerHTML = `<span style='color:var(--error)'>⚠ add amount to posting ${totalPostings}</span>`;
+                context = 'account_needs_amount';
+            } else if (currentLineHasNoAmount && totalPostings > 0) {
+                // In strict mode also warn if the account being typed is undeclared
+                if (SETTINGS.strictMode && currentAcc) {
+                    const clean = currentAcc.replace(/^[([]+|[)\]]+$/g, '');
+                    const knownAccounts = new Set([...Array.from(allowedAccounts), ...ENGINE.accounts]);
+                    const known = !clean || knownAccounts.has(clean) ||
+                        Array.from(knownAccounts).some(k => clean.startsWith(k + ':') || k.startsWith(clean + ':'));
+                    if (!known && clean.includes(':')) { // only warn once they've typed a full segment
+                        status.innerHTML = `<span style='color:var(--error)'>⚠ Unknown account (strict)</span>`;
+                    } else {
+                        status.innerHTML = `<span style='color:var(--warn)'>→ SPACE for amount</span>`;
+                    }
+                } else {
+                    status.innerHTML = `<span style='color:var(--warn)'>→ SPACE for amount (same line, hledger spec)</span>`;
+                }
+            } else if (explicitCount >= 1 && implicitCount === 1 && totalPostings >= 2) {
+                status.innerHTML = `<span style='color:var(--success)'>✓ auto-balances</span>`;
+            } else {
+                status.innerHTML = `<span style='color:var(--accent)'>POSTING ${totalPostings + 1}</span>`;
+            }
+        }
+
+        // Partial word the cursor is sitting in (used for filtering)
+        const partial = lineContent.replace(/^\s+/, '').split(/\s+/).pop() || '';
+
+        this.generateSuggestions(context, fullLine.trim(), partial, -currentBal, implicitCount, explicitCount);
+    },
+
+    /* ── generateSuggestions() ───────────────────────────────────────── */
+    generateSuggestions(context, trimmedLine, partial, balancingAmt, implicitCount = 0, explicitCount = 0) {
+        this.suggestions = [];
+
+        if (context === 'header') {
+            // After the date (>10 chars) suggest matching past descriptions,
+            // ranked by Oracle bigram memory then frequency
+            const dateLen = 10; // "YYYY-MM-DD"
+            if (trimmedLine.length > dateLen) {
+                const descPart = trimmedLine.substring(trimmedLine.indexOf(' ') + 1).toLowerCase();
+                const descCounts = {};
+                transactions.forEach(t => {
+                    if (t.desc.toLowerCase().includes(descPart))
+                        descCounts[t.desc] = (descCounts[t.desc] || 0) + 1 +
+                            (ENGINE.memory[`uni|${t.desc.toLowerCase()}`] || 0);
+                });
+                this.suggestions = Object.entries(descCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([desc]) => ({ text: desc, type: 'text', icon: '✎' }));
+            } else {
+                // Before description is typed: show recently used descriptions (top Oracle memory)
+                const recent = Object.keys(ENGINE.memory)
+                    .filter(k => k.startsWith('uni|'))
+                    .map(k => ({ key: k.slice(4), score: ENGINE.memory[k] }))
+                    .filter(({ key }) => transactions.some(t => t.desc.toLowerCase() === key))
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 6);
+                this.suggestions = recent.map(({ key }) => {
+                    const t = transactions.find(tx => tx.desc.toLowerCase() === key);
+                    return { text: t ? t.desc : key, type: 'text', icon: '🕐' };
+                });
+            }
+        }
+
+        else if (context === 'account') {
+            // Oracle-scored account + alias candidates, filtered by partial word
+            const search = partial.toLowerCase();
+            const all = ENGINE.getAccountCandidates();
+
+            // Also pull accounts used in previous postings of this same entry
+            // so the second posting line gets a smart sibling suggestion
+            const usedAccounts = new Set();
+            document.getElementById('active-editor').value.split('\n').forEach(l => {
+                if (!isPostingLine(l)) return;          // Unicode-safe
+                const acc = accFromLine(l);
+                if (acc) usedAccounts.add(acc.replace(/^[([]+|[)\]]+$/g, ''));
+            });
+
+            const scored = all.map(a => {
+                const tl = a.text.toLowerCase();
+                let score = 0;
+                if (search && !tl.includes(search)) return null;         // hard filter
+                if (search && tl.startsWith(search)) score += 30;
+                else if (search && tl.includes(search)) score += 10;
+                score += (ENGINE.memory[`uni|${tl}`] || 0) * 2;         // Oracle memory
+                if (usedAccounts.has(a.text)) score -= 5;               // deprioritise already-used
+                return { ...a, _score: score };
+            }).filter(Boolean).sort((a, b) => b._score - a._score).slice(0, 8);
+
+            // Ghost-text autocomplete: top result that starts with the partial
+            this._ghostSuffix = (scored[0] && search && scored[0].text.toLowerCase().startsWith(search))
+                ? scored[0].text.slice(partial.length) : '';
+
+            this.suggestions = scored;
+        }
+
+        else if (context === 'account_needs_amount') {
+            // Both postings lack amounts — guide user to go back and add one
+            const currentAcc = accFromLine(trimmedLine ? '    ' + trimmedLine : '') || trimmedLine.split(/\s/)[0];
+            if (currentAcc) {
+                const pastAmts = {};
+                transactions.forEach(t => t.posts.forEach(p => {
+                    if (p.acc === currentAcc && !p.isImplicit)
+                        pastAmts[fmtNum(Math.abs(p.val))] = (pastAmts[fmtNum(Math.abs(p.val))] || 0) + 1;
+                }));
+                Object.entries(pastAmts).sort((a, b) => b[1] - a[1]).slice(0, 4).forEach(([amt]) =>
+                    this.suggestions.push({ text: amt, type: 'math', icon: '💰', label: 'Amt' })
+                );
+            }
+            this.suggestions.push({ text: '← add amount above', type: 'hint', icon: '⚠️' });
+        }
+
+        else if (context === 'amount') {
+            // Balancing amount first (most useful)
+            if (Math.abs(balancingAmt) > 0.001)
+                this.suggestions.push({ text: fmtNum(balancingAmt), type: 'math', icon: '⚖️', label: 'Bal' });
+
+            // Common currency symbols
+            ['$', '€', '£', '¥', '₺'].forEach(sym =>
+                this.suggestions.push({ text: sym, type: 'curr', icon: '💱' })
+            );
+            // Known commodities from ledger
+            Array.from(availableCommodities).slice(0, 6).forEach(c =>
+                this.suggestions.push({ text: c, type: 'curr', icon: '💱' })
+            );
+
+            // Amounts used with the same account in past transactions (quick repeat)
+            const editorLines = document.getElementById('active-editor').value.split('\n');
+            // Find the most recent posting line without an amount (the one we're filling in)
+            let lastAcc = null;
+            for (let i = editorLines.length - 1; i >= 0; i--) {
+                const l = editorLines[i];
+                if (isPostingLine(l) && !ACC_RE.withGap.test(l)) {
+                    lastAcc = accFromLine(l);
+                    break;
+                }
+            }
+            if (lastAcc) {
+                const acc = lastAcc.replace(/^[([]+|[)\]]+$/g, '');
+                const pastAmts = {};
+                transactions.forEach(t => t.posts.forEach(p => {
+                    if (p.acc === acc && !p.isImplicit)
+                        pastAmts[fmtNum(Math.abs(p.val))] = (pastAmts[fmtNum(Math.abs(p.val))] || 0) + 1;
+                }));
+                Object.entries(pastAmts).sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(([amt]) =>
+                    this.suggestions.push({ text: amt, type: 'text', icon: '🕐' })
+                );
+            }
+        }
+
+        this.renderChips(this.suggestions);
+    },
+
+    /* ── renderChips() ───────────────────────────────────────────────── */
+    renderChips(list) {
+        const c = document.getElementById('editor-suggestions');
+        if (!list.length) { c.innerHTML = ''; return; }
+        c.innerHTML = list.map((item, idx) => {
+            const labelHtml = item.label ? `<span class="chip-label">${item.label}</span>` : '';
+            const iconHtml  = item.icon  ? `<i>${item.icon}</i>` : '';
+            const cls = ['chip',
+                item.type === 'math' ? 'math' : '',
+                idx === 0 ? 'best-match' : '',
+            ].join(' ').trim();
+            // Use display text for the chip label, but insert the real account text
+            const displayText = item.display || item.text;
+            const safeText = item.text.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<div class="${cls}" onmousedown="event.preventDefault()" onclick="Editor.insert('${safeText}')">${labelHtml}${iconHtml}<span>${escapeHtml(displayText)}</span></div>`;
+        }).join('');
+    },
+
+    /* ── insert(text) ────────────────────────────────────────────────── */
+    insert(text) {
+        const editor    = document.getElementById('active-editor');
+        const val       = editor.value;
+        const start     = editor.selectionStart;
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+        const lineEnd   = val.indexOf('\n', lineStart); // -1 if last line
+        const lineEndPos = lineEnd === -1 ? val.length : lineEnd;
+        const fullLine  = val.substring(lineStart, lineEndPos);
+        const lineContent = val.substring(lineStart, start);
+        const isHeader  = val.lastIndexOf('\n', lineStart - 1) === -1 && lineStart === 0;
+        const isAmount  = /^-?\d/.test(text) || ['$','€','£','¥'].includes(text);
+
+        let newVal, newCursor;
+
+        if (isAmount) {
+            // Find double-space separator in the full line (Unicode-safe)
+            const gapMatch = fullLine.match(ACC_RE.withGap);    // [1]=indent [2]=acc [3]=gap [4]=amt
+            if (gapMatch) {
+                // Replace whatever is in the amount slot with the new text
+                const amtStart = lineStart + gapMatch[1].length + gapMatch[2].length + gapMatch[3].length;
+                newVal    = val.slice(0, amtStart) + text + val.slice(lineEndPos);
+                newCursor = amtStart + text.length;
+            } else {
+                // No gap yet — insert after the account name with double space (Unicode-safe)
+                const accEnd = lineStart + accountEndIdx(fullLine);
+                newVal    = val.slice(0, accEnd) + '  ' + text + val.slice(lineEndPos);
+                newCursor = accEnd + 2 + text.length;
+            }
+
+        } else if (isHeader) {
+            // Replace description (everything after "YYYY-MM-DD ") to end of line
+            const spaceIdx    = fullLine.indexOf(' ');
+            const replaceFrom = lineStart + (spaceIdx !== -1 ? spaceIdx + 1 : fullLine.length);
+            newVal    = val.slice(0, replaceFrom) + text + val.slice(lineEndPos);
+            newCursor = replaceFrom + text.length;
+
+        } else {
+            // Account insertion — replace from end of indent to end of current word
+            const indentLen   = fullLine.match(/^\s*/)[0].length;
+            const replaceFrom = lineStart + indentLen;
+            // End of word = next double-space or end of line
+            const wordEnd = fullLine.slice(indentLen).search(/\s{2,}|$/);
+            const replaceTo = replaceFrom + (wordEnd === -1 ? fullLine.slice(indentLen).length : wordEnd);
+            // Insert account, then double-space so cursor lands in amount position
+            newVal    = val.slice(0, replaceFrom) + text + '  ' + val.slice(replaceTo);
+            newCursor = replaceFrom + text.length + 2;
+        }
+
+        editor.value = newVal;
+        editor.selectionStart = editor.selectionEnd = newCursor;
+        editor.focus();
+        this.analyze();
+    },
+};
+
+/* =========================================
+   UI EVENTS & LOGIC
+   ========================================= */
+const content = document.getElementById('terminal-content');
+const container = document.getElementById('terminal-container');
+const input = document.getElementById('cmd-input');
+const ghost = document.getElementById('ghost-text');
+const suggs = document.getElementById('suggestions');
+const tabBtn = document.getElementById('tab-btn');
+const inputWrapper = document.getElementById('input-wrapper');
+const fileInput = document.getElementById('file-input');
+const ctxBadge = document.getElementById('context-badge');
+let activeFilter = 'all'; let pendingLedgerAction = null;
+
+// Command history
+const CmdHistory = {
+    list: JSON.parse(localStorage.getItem('HL_HISTORY') || '[]'),
+    pos: -1,
+    save(cmd) {
+        if (!cmd || this.list[0] === cmd) return;
+        this.list.unshift(cmd);
+        if (this.list.length > 100) this.list.pop();
+        localStorage.setItem('HL_HISTORY', JSON.stringify(this.list));
+        this.pos = -1;
+    },
+    up() { if (this.pos < this.list.length - 1) { this.pos++; return this.list[this.pos]; } return null; },
+    dn() { if (this.pos > 0) { this.pos--; return this.list[this.pos]; } this.pos = -1; return ''; },
+    reset() { this.pos = -1; }
+};
+
+window.toggleKeys = function() { document.getElementById('keys-modal').classList.toggle('open'); };
+
+function log(msg, type='text') {
+    const div = document.createElement('div'); div.className = `line ${type}`; div.innerHTML = msg;
+    const frag = document.createDocumentFragment(); frag.appendChild(div);
+    content.appendChild(frag); container.scrollTop = container.scrollHeight;
+}
+
+let _toastTimer = null;
+function toast(msg, dur = 2000) {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+async function run(raw) {
+    const val = raw.trim(); if (!val) return;
+    if (ConfirmationMode.active) { return ConfirmationMode.process(val.toLowerCase()); } 
+    ENGINE.learn(val);
+    CmdHistory.save(val);
+    const lowerVal = val.toLowerCase();
+    log(escapeHtml(val), 'cmd');
+    
+    const mathRes = MathEngine.eval(val); 
+    if (mathRes !== null && !ENGINE.grammar[lowerVal.split(' ')[0]]) { log(`= ${mathRes}`, 'success'); return; }
+
+    const parts = lowerVal.split(' '); const verb = parts[0];
+    // Preserve original-case args so account names like "expenses:Food" are not mangled
+    const rawParts = val.split(' '); const args = rawParts.slice(1);
+
+    if (verb === 'config') {
+        const sub = args[0];
+        if (sub === 'list') { Object.entries(ConfigManager.data).forEach(([k,v]) => log(`${k} = ${v}`, 'text')); return; }
+        if (sub === 'set') { ConfigManager.set(args[1], args[2]); log(`Config ${args[1]} set to ${args[2]}`, 'success'); return; }
+        if (sub === 'strict') { const s = SETTINGS.toggleStrict(); log(`Strict Mode: ${s?'ON':'OFF'}`, s?'success':'warn'); return; }
+        if (sub === 'theme') {
+            if (args[1] === 'reset') ThemeManager.reset();
+            else if (args[1] === 'font') ThemeManager.setFont(args[2]);
+            else if (args[1] === 'bg') ThemeManager.setBg(args[2]);
+            else if (args[1] === 'text') ThemeManager.setText(args[2]);
+            else ThemeManager.setPreset(args[1]);
+            log("Theme updated.", 'success'); return;
+        }
+        if (sub === 'budget') {
+            if (!args[1] || args[1] === 'list') {
+                const bals = {}; const now = new Date(); const ym = now.toISOString().slice(0, 7);
+                transactions.forEach(t => { if (!t.date.startsWith(ym)) return; t.posts.forEach(p => { if (p.acc.startsWith('expenses')) bals[p.acc] = (bals[p.acc] || 0) + p.val; }); });
+                const budgets = BudgetManager.get();
+                Object.entries(budgets).forEach(([cat, limit]) => {
+                    let spent = 0; Object.keys(bals).forEach(acc => { if (acc.includes(cat)) spent += bals[acc]; });
+                    const pct = Math.min(100, (spent / limit) * 100); let cls = 'budget-fill'; if (pct > 85) cls += ' warn'; if (spent > limit) cls += ' over';
+                    log(`<div class="budget-row"><div class="budget-label"><span>${escapeHtml(cat)}</span><span>${fmtNum(spent)} / ${fmtNum(limit)}</span></div><div class="budget-track"><div class="${cls}" style="width:${pct}%"></div></div></div>`);
+                });
+            } 
+            else if (args[1] === 'rm') { ConfirmationMode.start('Remove Budget', () => { BudgetManager.remove(args[2]); log(`Removed.`, 'success'); }); return; } 
+            else if (args[1] === 'set') { BudgetManager.set(args[2], args[3]); log(`Set.`, 'success'); }
+            return;
+        }
+        log("Usage: config <set|list|strict|theme|budget>", 'system'); return;
+    }
+
+    if (verb === 'tutorial') {
+        const sub = args[0];
+        if (!sub || sub === 'basics') { log(`<div class="pnl-head">BASICS</div><div class="help-cmd"><span>add</span><span>Open Smart Editor to record a transaction</span></div><div class="help-cmd"><span>dash</span><span>View net worth &amp; monthly summary</span></div><div class="help-cmd"><span>bal assets</span><span>Check account balances</span></div><div class="help-cmd"><span>reg expenses</span><span>Transaction register with running total</span></div><div class="help-cmd"><span>graph income expenses</span><span>Visual spending chart</span></div><div class="help-cmd"><span>mount</span><span>Link a .hledger file for persistent storage</span></div>`); }
+        else if (sub === 'tips') { log(`<div class="pnl-head">POWER TIPS</div><div class="help-cmd"><span>graph expenses type:bar by:month</span><span>Monthly bar chart</span></div><div class="help-cmd"><span>reg expenses date:thismonth</span><span>This month only</span></div><div class="help-cmd"><span>bal -liabilities</span><span>Exclude liabilities</span></div><div class="help-cmd"><span>config budget set food 500</span><span>Set spending limit</span></div><div class="help-cmd"><span>recur groceries</span><span>Repeat a past transaction</span></div><div class="help-cmd"><span>export csv</span><span>Download as spreadsheet</span></div><div class="help-cmd"><span>config theme nord</span><span>Themes: matrix, dracula, paper, solarized, catppuccin, nord, monokai</span></div><div class="help-cmd"><span>net</span><span>Quick net worth summary</span></div><div class="help-cmd"><span>n (empty input)</span><span>Quick shortcut: new transaction</span></div><div class="help-cmd"><span>p (empty input)</span><span>Quick shortcut: P&amp;L statement</span></div>`); }
+        else if (sub === 'backup') { log(`<div class="pnl-head">BACKUP &amp; SYNC</div><div class="help-cmd"><span>install</span><span>Install as offline app (no internet needed after install)</span></div><div class="help-cmd"><span>pwa status</span><span>Check installation &amp; service worker status</span></div><div class="help-cmd"><span>mount</span><span>Pick a .hledger file (opens file picker)</span></div><div class="help-cmd"><span>remount</span><span>Re-link previously mounted file silently</span></div><div class="help-cmd"><span>unmount</span><span>Disconnect file link &amp; forget it</span></div><div class="help-cmd"><span>export</span><span>Download .hledger snapshot</span></div><div class="help-cmd"><span>export copy</span><span>Copy raw ledger to clipboard</span></div><div class="help-cmd"><span>ledger import</span><span>Load a .hledger file (appends)</span></div>`, 'text'); }
+        else { log(`tutorial [basics|tips|backup]`, 'system'); }
+    }
+    else if (verb === 'search') {
+        const q = args.join(' ').toLowerCase();
+        if (!q) { log('Usage: search <text>', 'error'); return; }
+        const results = transactions.filter(t => 
+            t.desc.toLowerCase().includes(q) || 
+            t.posts.some(p => p.acc.toLowerCase().includes(q) || (p.rawAmt && p.rawAmt.toLowerCase().includes(q)))
+        );
+        if (!results.length) { log(`No results for "${escapeHtml(q)}".`, 'system'); return; }
+        const escQ = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const highlight = (s) => escapeHtml(s).replace(new RegExp(escQ, 'gi'), m => `<span class="search-highlight">${m}</span>`);
+        log(`<div class="search-count">${results.length} result${results.length!==1?'s':''} for "<b>${escapeHtml(q)}</b>"</div>`);
+        results.slice(0, 30).forEach(t => {
+            const postHtml = t.posts.map(p => `<div class="search-result-post">${highlight(p.acc)}${p.rawAmt ? '  ' + highlight(p.rawAmt) : ''}</div>`).join('');
+            log(`<div class="search-result-row"><div class="search-result-header"><span class="search-result-date">${t.date}</span><span class="search-result-desc">${highlight(t.desc)}</span></div>${postHtml}</div>`);
+        });
+        if (results.length > 30) log(`… and ${results.length - 30} more. Narrow your search.`, 'system');
+    }
+    else if (verb === 'recent') {
+        const n = parseInt(args[0]) || 10;
+        const recent = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, n);
+        if (!recent.length) { log('No transactions.', 'system'); return; }
+        log(`<div class="search-count">Last ${recent.length} transaction${recent.length!==1?'s':''}</div>`);
+        recent.forEach((t, i) => {
+            const mainPost = t.posts.find(p => !p.isImplicit) || t.posts[0];
+            // Determine net flow direction: if expenses > 0, it's spending (show negative); income < 0, it's earning
+            const expPost = t.posts.find(p => p.acc.startsWith('expenses'));
+            const incPost = t.posts.find(p => p.acc.startsWith('income'));
+            const isExpense = !!expPost && expPost.val > 0;
+            const isIncome = !!incPost && incPost.val < 0;
+            const isDebit = isExpense || (!isIncome && mainPost && mainPost.val < 0);
+            const allAmts = t.posts.filter(p => !p.isImplicit);
+            // Show magnitude of the largest absolute posting
+            const totalAmt = Math.max(...allAmts.map(p => Math.abs(p.val)), 0);
+            const color = isDebit ? 'var(--error)' : 'var(--success)';
+            const sign = isDebit ? '-' : '+';
+            const cls = isDebit ? 'debit' : 'credit';
+            const flagStr = t.flag ? `<span style="color:var(--warn);margin-right:4px">${t.flag}</span>` : '';
+            const accs = t.posts.map(p => escapeHtml(p.acc.split(':').pop())).join(' → ');
+            log(`<div class="recent-txn ${cls}"><div class="recent-meta"><span>${t.date}</span><span style="color:var(--accent);font-size:10px">#${transactions.indexOf(t)}</span></div><div style="display:flex;justify-content:space-between;align-items:baseline">${flagStr}<span class="recent-desc">${escapeHtml(t.desc)}</span><span class="recent-amount" style="color:${color}">${sign}${fmtNum(totalAmt)}</span></div><div style="font-size:10px;color:var(--ghost);margin-top:2px">${accs}</div></div>`);
+        });
+    }
+    else if (verb === 'trend') {
+        const accFilter = args.join(' ') || 'expenses';
+        // Get last 6 months of data
+        const months = [];
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            months.push(d.toISOString().slice(0, 7));
+        }
+        const buckets = {};
+        months.forEach(m => buckets[m] = 0);
+        transactions.forEach(t => {
+            const m = t.date.slice(0, 7);
+            if (!buckets.hasOwnProperty(m)) return;
+            t.posts.forEach(p => { if (p.acc.includes(accFilter)) buckets[m] += Math.abs(p.val); });
+        });
+        const vals = months.map(m => buckets[m]);
+        const maxVal = Math.max(...vals, 1);
+        let html = `<div class="pnl-head">TREND: ${escapeHtml(accFilter.toUpperCase())} <span class="sparkline-wrap">${vals.map(v => `<div class="spark-bar${v < 0 ? ' neg' : ''}" style="height:${Math.max(2,Math.round((v/maxVal)*18))}px"></div>`).join('')}</span></div>`;
+        for (let i = 0; i < months.length; i++) {
+            const v = vals[i]; const prev = vals[i-1];
+            let pct = '', cls = 'trend-flat', arrow = '→';
+            if (i > 0 && prev > 0.01) { const change = ((v - prev) / prev) * 100; pct = ` (${change > 0 ? '+' : ''}${change.toFixed(1)}%)`; if (change > 5) { cls = 'trend-up'; arrow = '↑'; } else if (change < -5) { cls = 'trend-dn'; arrow = '↓'; } }
+            html += `<div class="trend-row"><span>${months[i]}</span><span class="trend-pct ${cls}">${arrow} ${fmtNum(v)}${pct}</span></div>`;
+        }
+        log(html);
+    }
+    else if (verb === 'forecast') {
+        const days = Math.min(parseInt(args[0]) || 30, 90);
+        // Detect recurring transactions: find transactions that repeat within 25-35 day windows
+        const descFreq = {};
+        transactions.forEach(t => {
+            const key = t.desc.toLowerCase();
+            if (!descFreq[key]) descFreq[key] = [];
+            descFreq[key].push(t.date);
+        });
+        const recurring = [];
+        Object.entries(descFreq).forEach(([desc, dates]) => {
+            if (dates.length < 2) return;
+            const sorted = [...dates].sort();
+            const diffs = [];
+            for (let i = 1; i < sorted.length; i++) {
+                const d1 = new Date(sorted[i-1]); const d2 = new Date(sorted[i]);
+                diffs.push(Math.round((d2-d1)/(1000*60*60*24)));
+            }
+            const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+            if (avgDiff >= 20 && avgDiff <= 40) {
+                const lastDate = new Date(sorted[sorted.length-1]);
+                const nextDate = new Date(lastDate.getTime() + avgDiff * 86400000);
+                const txn = transactions.find(t => t.desc.toLowerCase() === desc && t.date === sorted[sorted.length-1]);
+                const amt = txn ? txn.posts.filter(p=>!p.isImplicit).reduce((s,p)=>s+p.val,0) : 0;
+                recurring.push({ desc, nextDate, amt, period: Math.round(avgDiff) });
+            }
+        });
+        const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + days);
+        const upcoming = recurring.filter(r => r.nextDate >= new Date() && r.nextDate <= cutoff)
+            .sort((a,b) => a.nextDate - b.nextDate);
+        if (!upcoming.length) { log(`No recurring patterns detected in the next ${days} days.`, 'system'); return; }
+        let projected = 0;
+        let html = `<div class="pnl-head">FORECAST: Next ${days} days</div>`;
+        upcoming.forEach(r => {
+            const color = r.amt < 0 ? 'var(--error)' : 'var(--success)';
+            const ds = r.nextDate.toISOString().split('T')[0];
+            projected += r.amt;
+            html += `<div class="forecast-row"><span class="forecast-date">${ds}</span><span class="forecast-desc">${escapeHtml(r.desc)}<span style="color:var(--ghost);font-size:10px"> (~${r.period}d)</span></span><span class="forecast-amt" style="color:${color}">${fmtNum(r.amt)}</span></div>`;
+        });
+        html += `<div class="pnl-total" style="display:flex;justify-content:space-between;margin-top:8px"><span>Projected net</span><span style="color:${projected >= 0 ? 'var(--success)' : 'var(--error)'}">${fmtNum(projected)}</span></div>`;
+        log(html);
+    }
+    else if (verb === 'dash') {
+        let assets = 0, liabilities = 0, inc = 0, exp = 0; 
+        let cats = {}; 
+        const now = new Date(); const ym = now.toISOString().slice(0, 7);
+        const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0, 7);
+        let lastInc = 0, lastExp = 0;
+        // Detect dominant commodity
+        const commCount = {};
+        transactions.forEach(t => {
+            t.posts.forEach(p => { 
+                if (p.acc.startsWith('assets')) assets = Math.round((assets + p.val + Number.EPSILON) * 100) / 100;
+                else if (p.acc.startsWith('liabilities')) liabilities = Math.round((liabilities + p.val + Number.EPSILON) * 100) / 100;
+                if (p.comm) commCount[p.comm] = (commCount[p.comm] || 0) + 1;
+            });
+            if (t.date.startsWith(ym)) { 
+                t.posts.forEach(p => { 
+                    if (p.acc.startsWith('income')) inc = Math.round((inc + p.val + Number.EPSILON) * 100) / 100;
+                    else if (p.acc.startsWith('expenses')) { 
+                        exp = Math.round((exp + p.val + Number.EPSILON) * 100) / 100;
+                        const cat = p.acc.split(':')[1] || 'misc'; 
+                        cats[cat] = Math.round(((cats[cat]||0) + p.val + Number.EPSILON) * 100) / 100;
+                    } 
+                }); 
+            }
+            if (t.date.startsWith(lastMonth)) {
+                t.posts.forEach(p => {
+                    if (p.acc.startsWith('income')) lastInc = Math.round((lastInc + p.val + Number.EPSILON) * 100) / 100;
+                    else if (p.acc.startsWith('expenses')) lastExp = Math.round((lastExp + p.val + Number.EPSILON) * 100) / 100;
+                });
+            }
+        });
+        // Dominant commodity symbol — detect position from actual postings
+        const domComm = Object.entries(commCount).sort((a,b) => b[1]-a[1])[0]?.[0] || '';
+        let domPos = 'right';
+        if (domComm) {
+            const samplePost = transactions.map(t => t.posts).flat().find(p => p.comm === domComm);
+            if (samplePost) domPos = samplePost.pos || 'right';
+        }
+        const fmt = (v) => domComm ? fmtAmt(Math.abs(v), domComm, domPos) : fmtNum(Math.abs(v));
+        const netWorth = Math.round((assets + liabilities + Number.EPSILON) * 100) / 100;
+        const monthlyNet = Math.round((inc + exp + Number.EPSILON) * 100) / 100;
+        const lastMonthlyNet = Math.round((lastInc + lastExp + Number.EPSILON) * 100) / 100;
+        const savingsRate = Math.abs(inc) > 0.01 ? (monthlyNet / Math.abs(inc) * 100) : 0;
+        const topCat = Object.entries(cats).sort((a,b) => b[1]-a[1])[0]; 
+        const activeDays = new Set(transactions.filter(t => t.date.startsWith(ym)).map(t => t.date)).size;
+        const errorCount = transactions.filter(t => t._error).length;
+        
+        // Month-over-month change helpers
+        const mom = (cur, prev) => {
+            if (Math.abs(prev) < 0.01) return '';
+            const pct = ((Math.abs(cur) - Math.abs(prev)) / Math.abs(prev) * 100);
+            const sign = pct >= 0 ? '▲' : '▼';
+            const col = pct >= 0 ? 'var(--error)' : 'var(--success)'; // more expense = bad
+            return `<span style="font-size:10px;color:${col}"> ${sign}${Math.abs(pct).toFixed(0)}%</span>`;
+        };
+        const momInc = (cur, prev) => {
+            if (Math.abs(prev) < 0.01) return '';
+            const pct = ((Math.abs(cur) - Math.abs(prev)) / Math.abs(prev) * 100);
+            const sign = pct >= 0 ? '▲' : '▼';
+            const col = pct >= 0 ? 'var(--success)' : 'var(--error)'; // more income = good
+            return `<span style="font-size:10px;color:${col}"> ${sign}${Math.abs(pct).toFixed(0)}%</span>`;
+        };
+        
+        // Top expense categories
+        const topCats = Object.entries(cats).sort((a,b) => b[1]-a[1]).slice(0,3);
+        let catsHtml = '';
+        if (topCats.length > 0) {
+            const maxCat = Math.abs(topCats[0][1]);
+            catsHtml = `<div class="dash-card" style="grid-column:span 2"><div class="dash-label">Top Expenses — ${ym}</div>${
+                topCats.map(([cat,val]) => {
+                    const pct = maxCat > 0 ? (Math.abs(val)/maxCat*100) : 0;
+                    return `<div style="margin-top:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span>${escapeHtml(cat)}</span><span style="color:var(--error)">${fmt(Math.abs(val))}</span></div><div style="height:5px;background:var(--ghost);border-radius:3px;overflow:hidden"><div style="width:${pct.toFixed(0)}%;height:100%;background:var(--error);opacity:0.7;border-radius:3px"></div></div></div>`;
+                }).join('')
+            }</div>`;
+        }
+        
+        const html = `<div class="dash-grid">
+            <div class="dash-card"><div class="dash-label">Net Worth</div><div class="dash-val" style="color:${netWorth>=0?'var(--success)':'var(--error)'}">${fmt(netWorth)}</div></div>
+            <div class="dash-card"><div class="dash-label">Month Net (${ym})</div><div class="dash-val" style="color:${monthlyNet>=0?'var(--success)':'var(--error)'}">${fmt(monthlyNet)}</div></div>
+            <div class="dash-card"><div class="dash-label">Income</div><div class="dash-val" style="color:var(--success)">${fmt(Math.abs(inc))}${momInc(inc, lastInc)}</div></div>
+            <div class="dash-card"><div class="dash-label">Expenses</div><div class="dash-val" style="color:var(--error)">${fmt(Math.abs(exp))}${mom(exp, lastExp)}</div></div>
+            <div class="dash-card"><div class="dash-label">Savings Rate</div><div class="dash-val" style="color:${savingsRate>=20?'var(--success)':savingsRate>=0?'var(--warn)':'var(--error)'}">${savingsRate.toFixed(1)}%</div></div>
+            <div class="dash-card"><div class="dash-label">Accounts · Transactions</div><div class="dash-val">${ENGINE.accounts.length} · ${transactions.length}</div>
+            ${errorCount > 0 ? `<div class="dash-label" style="color:var(--error);margin-top:4px">⚠ ${errorCount} error${errorCount!==1?'s':''} — run check</div>` : ''}
+            </div>
+            ${catsHtml}
+        </div>`;
+        log(html);
+    }
+    else if (verb === 'mount') { await Persistence.mount(); }
+    else if (verb === 'remount') { 
+        const result = await Persistence.remount({ silent: false });
+        if (!result && !Persistence.fileHandle) log('No stored file handle found. Use <b>mount</b> to pick a file.', 'warn');
+    }
+    else if (verb === 'unmount') {
+        if (!Persistence.fileHandle) { log('No file currently mounted.', 'system'); return; }
+        const name = Persistence.fileHandle.name;
+        Persistence.unmount(true); // clear stored handle too
+        log(`✓ Unmounted and forgot "${name}". Future sessions will start localStorage-only.`, 'success');
+    }
+    else if (verb === 'pwa') { 
+        const sub = args[0];
+        if (sub === 'update') { PwaManager.update(); }
+        else if (sub === 'status') { await PwaManager.showStatus(); }
+        else { log(`<div class="pnl-head">PWA COMMANDS</div><div class="help-cmd"><span>pwa status</span><span>Installation &amp; SW status</span></div><div class="help-cmd"><span>pwa update</span><span>Check for app update</span></div><div class="help-cmd"><span>install</span><span>Prompt to install as native app</span></div>`, 'system'); }
+    }
+    else if (verb === 'install') { PwaManager.promptInstall(); }
+    else if (verb === 'check') {
+        let errors = 0; let warnings = 0;
+        log(`<div class="pnl-head">INTEGRITY CHECK</div>`);
+        // 1. Check transaction balance
+        transactions.forEach((t, i) => { 
+            if (t._error) { 
+                log(`FAIL #${i} ${t.date} "${escapeHtml(t.desc)}": ${escapeHtml(t._error)}`, 'error'); 
+                errors++; 
+            } 
+        });
+        // 2. Check balance assertions
+        assertions.forEach(a => { 
+            let bal = 0; 
+            transactions.filter(t => t.date <= a.date).forEach(t => t.posts.forEach(p => { if(p.acc === a.acc || p.acc.startsWith(a.acc + ':')) bal += p.val; }));
+            bal = Math.round((bal + Number.EPSILON) * 100) / 100;
+            if (Math.abs(bal - a.val) > 0.01) { 
+                log(`FAIL Assert ${a.date} ${a.acc}: expected ${fmtNum(a.val)}, got ${fmtNum(bal)} (off by ${fmtNum(bal - a.val)})`, 'error'); 
+                errors++; 
+            } else {
+                log(`PASS Assert ${a.date} ${a.acc} = ${fmtNum(a.val)}`, 'success');
+            }
+        });
+        // 3. Check for duplicate transactions (same date+desc+amount)
+        const seen = new Map();
+        transactions.forEach((t, i) => {
+            const sig = `${t.date}|${t.desc}|${t.posts.map(p => p.val).join(',')}`;
+            if (seen.has(sig)) { 
+                log(`WARN #${i} Possible duplicate of #${seen.get(sig)}: ${t.date} "${escapeHtml(t.desc)}"`, 'warn'); 
+                warnings++; 
+            } else { seen.set(sig, i); }
+        });
+        // 4. Check accounts used but not declared
+        if (SETTINGS.strictMode) {
+            const declaredAccounts = directiveLines.filter(l => l.startsWith('account ')).map(l => l.split(' ')[1]);
+            const usedUndeclared = new Set();
+            transactions.forEach(t => t.posts.forEach(p => {
+                if (!declaredAccounts.some(d => p.acc === d || p.acc.startsWith(d + ':'))) usedUndeclared.add(p.acc);
+            }));
+            usedUndeclared.forEach(acc => { log(`WARN Undeclared account: ${escapeHtml(acc)}`, 'warn'); warnings++; });
+        }
+        // Summary
+        if (errors === 0 && warnings === 0) log(`✓ All checks passed (${transactions.length} transactions, ${assertions.length} assertions).`, 'success'); 
+        else log(`${errors > 0 ? `${errors} error${errors!==1?'s':''}` : ''}${errors > 0 && warnings > 0 ? ', ' : ''}${warnings > 0 ? `${warnings} warning${warnings!==1?'s':''}` : ''}.`, errors > 0 ? 'error' : 'warn');
+    }
+    else if (verb === 'account') { if (args[0] === 'add') { if (LedgerManager.addAccount(args[1])) log(`Account ${args[1]} added.`, 'success'); else log("Exists or invalid.", 'warn'); } }
+    else if (verb === 'graph') { log(GraphEngine.generate(transactions, args)); }
+    else if (verb === 'stats') { 
+        const datesSorted = [...transactions].sort((a,b) => a.date.localeCompare(b.date));
+        const first = datesSorted[0]?.date || '—'; 
+        const last = datesSorted[datesSorted.length-1]?.date || '—';
+        const totalDebits = transactions.reduce((s,t) => s + t.posts.filter(p => p.val < 0).reduce((a,p) => a+p.val, 0), 0);
+        const totalCredits = transactions.reduce((s,t) => s + t.posts.filter(p => p.val > 0).reduce((a,p) => a+p.val, 0), 0);
+        const avgTxn = transactions.length ? Math.abs(totalDebits / transactions.length) : 0;
+        const errorCount = transactions.filter(t => t._error).length;
+        // Commodities used
+        const comms = new Set(); transactions.forEach(t => t.posts.forEach(p => { if (p.comm) comms.add(p.comm); }));
+        // Storage info
+        const rawLen = LedgerManager.getRaw().length;
+        const backupCount = Persistence.listBackups().length;
+        const mounted = Persistence.fileHandle ? '✓ File mounted' : '✗ localStorage only';
+        const cmdCount = CmdHistory.list.length;
+        log(`<div class="pnl-head">LEDGER STATS: ${LedgerManager.current}</div>
+            <div class="stat-row"><span>Transactions</span><span>${transactions.length}${errorCount > 0 ? ` <span style="color:var(--error)">(${errorCount} errors)</span>` : ''}</span></div>
+            <div class="stat-row"><span>Accounts</span><span>${ENGINE.accounts.length}</span></div>
+            <div class="stat-row"><span>Balance assertions</span><span>${assertions.length}</span></div>
+            <div class="stat-row"><span>Aliases</span><span>${Object.keys(fileAliases).length}</span></div>
+            <div class="stat-row"><span>Tags</span><span>${availableTags.size}</span></div>
+            <div class="stat-row"><span>Date range</span><span>${first} → ${last}</span></div>
+            <div class="stat-row"><span>Avg transaction size</span><span>${fmtNum(avgTxn)}</span></div>
+            <div class="stat-row"><span>Total debits</span><span style="color:var(--error)">${fmtNum(Math.abs(totalDebits))}</span></div>
+            <div class="stat-row"><span>Total credits</span><span style="color:var(--success)">${fmtNum(totalCredits)}</span></div>
+            <div class="stat-row"><span>Commodities</span><span>${comms.size > 0 ? Array.from(comms).join(', ') : '(default)'}</span></div>
+            <div class="stat-row"><span>Storage</span><span>${mounted}</span></div>
+            <div class="stat-row"><span>File size</span><span>${rawLen} bytes</span></div>
+            <div class="stat-row"><span>Auto-backups</span><span>${backupCount}</span></div>
+            <div class="stat-row"><span>Commands used</span><span>${cmdCount}</span></div>`); 
+    }
+    else if (verb === 'rm') { 
+        const id = parseInt(args[0]); 
+        if (isNaN(id)) { log('Usage: rm <transaction-id> (find IDs with "recent")', 'error'); return; }
+        if (id < 0 || id >= transactions.length) { log(`Transaction #${id} not found. Valid range: 0-${transactions.length-1}`, 'error'); return; }
+        const txn = transactions[id];
+        log(`About to delete: ${txn.date} "${escapeHtml(txn.desc)}" (${txn.posts.length} postings)`, 'warn');
+        ConfirmationMode.start(`Delete Transaction #${id}`, () => { 
+            if (LedgerManager.delete(id)) log(`✓ Deleted #${id}: "${escapeHtml(txn.desc)}". Backup saved.`, 'success'); 
+            else log(`Delete failed.`, 'error'); 
+        }); 
+    }
+    else if (verb === 'reg') {
+        const q = args.join(' ');
+        const subset = transactions.filter(t => match(t, q)).sort((a,b) => a.date.localeCompare(b.date));
+        if (!subset.length) { log(`No transactions match "${escapeHtml(q) || 'all'}".`, 'system'); return; }
+
+        // Determine account filter for running balance column
+        // Prefer explicit acc: prefix, then fall back to bare account-like args
+        let accFilter = null;
+        const accArg = args.find(a => a.startsWith('acc:'));
+        if (accArg) {
+            accFilter = accArg.substring(4);
+        } else {
+            const bareAcc = args.find(a =>
+                !a.startsWith('date:') && !a.startsWith('tag:') && !a.startsWith('amt:') &&
+                !a.startsWith('desc:') && !a.startsWith('flag:') &&
+                ENGINE.accounts.some(acc => acc.toLowerCase().includes(a.toLowerCase()))
+            );
+            if (bareAcc) accFilter = bareAcc;
+        }
+
+        let runningBal = 0;
+        let runningComm = '';
+        // For grand total when no accFilter, track all postings total
+        let grandTotal = 0;
+        let grandComm = '';
+
+        let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="data-table" style="min-width:100%">
+            <thead><tr>
+                <th style="min-width:88px;white-space:nowrap">Date</th>
+                <th style="min-width:120px">Description</th>
+                <th style="min-width:140px">Account</th>
+                <th class="num" style="min-width:90px;white-space:nowrap">Amount</th>
+                <th class="num" style="min-width:90px;white-space:nowrap">Balance</th>
+            </tr></thead><tbody>`;
+
+        let rowCount = 0;
+        let postingTotal = 0; // sum of all rendered posting amounts
+
+        subset.forEach(t => {
+            // Decide which postings to show
+            const matchedPosts = accFilter
+                ? t.posts.filter(p => p.acc.toLowerCase().includes(accFilter.toLowerCase()))
+                : t.posts;
+            if (!matchedPosts.length) return;
+
+            matchedPosts.forEach((p, pi) => {
+                rowCount++;
+                runningBal = Math.round((runningBal + p.val + Number.EPSILON) * 100) / 100;
+                if (p.comm && !runningComm) runningComm = p.comm;
+
+                // Amount color: for expense accounts positive debit = spending = red
+                // For asset/equity accounts positive = good = green
+                // General rule: use sign of val — negative always error, positive always success
+                // But for explicit expense-only filters: positive = debit = spending = error
+                const isExpenseAcc = p.acc.startsWith('expenses');
+                const color = p.val < 0 ? 'var(--error)' : p.val > 0 ? (isExpenseAcc ? 'var(--error)' : 'var(--success)') : 'var(--accent)';
+
+                // Running balance color: depends on account type
+                const balIsExpense = accFilter && accFilter.toLowerCase().startsWith('expense');
+                const balColor = runningBal === 0 ? 'var(--accent)' : runningBal < 0 ? 'var(--error)' : (balIsExpense ? 'var(--error)' : 'var(--success)');
+
+                const amtStr = p.comm ? fmtAmt(p.val, p.comm, p.pos) : fmtNum(p.val);
+                const balStr = runningComm ? fmtAmt(runningBal, runningComm, 'right') : fmtNum(runningBal);
+
+                // Only show date + desc on first posting of each transaction
+                const showMeta = pi === 0;
+                html += `<tr>
+                    <td style="color:var(--accent);white-space:nowrap;vertical-align:top">${showMeta ? escapeHtml(t.date) : ''}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top"${showMeta && t.flag ? ` title="${escapeHtml(t.flag)} ${escapeHtml(t.desc)}"` : ''}>${showMeta ? (t.flag ? `<span style="color:var(--warn)">${escapeHtml(t.flag)}</span> ` : '') + escapeHtml(t.desc) : ''}</td>
+                    <td style="color:var(--ghost);font-size:0.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">${escapeHtml(p.acc)}</td>
+                    <td class="num" style="color:${color};white-space:nowrap">${escapeHtml(amtStr)}</td>
+                    <td class="num" style="color:${balColor};white-space:nowrap">${escapeHtml(balStr)}</td>
+                </tr>`;
+            });
+        });
+
+        html += `</tbody>`;
+
+        // Footer: running balance total row
+        if (rowCount > 0) {
+            const balStr = runningComm ? fmtAmt(runningBal, runningComm, 'right') : fmtNum(runningBal);
+            const balIsExpense = accFilter && accFilter.toLowerCase().startsWith('expense');
+            const balColor = runningBal === 0 ? 'var(--accent)' : runningBal < 0 ? 'var(--error)' : (balIsExpense ? 'var(--error)' : 'var(--success)');
+            html += `<tfoot><tr style="border-top:1px solid var(--accent)">
+                <td colspan="4" style="padding-top:6px;font-size:0.85em;color:var(--accent)">${rowCount} posting${rowCount!==1?'s':''} · ${subset.length} txn${subset.length!==1?'s':''}</td>
+                <td class="num" style="color:${balColor};font-weight:bold;padding-top:6px;white-space:nowrap">${escapeHtml(balStr)}</td>
+            </tr></tfoot>`;
+        }
+
+        html += `</table></div>`;
+        log(html);
+    }
+    else if (verb === 'tags') { 
+        const tagList = Array.from(availableTags);
+        if (!tagList.length) { log('No tags found.', 'system'); return; }
+        log(`<div class="pnl-head">TAGS (${tagList.length})</div>`);
+        tagList.sort().forEach(t => {
+            const tagKey = t.replace('tag:', '');
+            const count = transactions.filter(tx => tx.tags && tx.tags[tagKey] !== undefined).length;
+            log(`<div class="stat-row"><span>${escapeHtml(t)}</span><span style="color:var(--accent)">${count} txn${count!==1?'s':''}</span></div>`);
+        });
+    }
+    else if (verb === 'accounts') {
+        const accArgs = args.join(' ');
+        const accs = ENGINE.accounts.filter(a => !accArgs || a.includes(accArgs));
+        if (!accs.length) { log('No accounts found.', 'system'); return; }
+        const total = {}; accs.forEach(a => { total[a] = 0; });
+        transactions.forEach(t => t.posts.forEach(p => { if (total.hasOwnProperty(p.acc)) total[p.acc] = Math.round((total[p.acc] + p.val + Number.EPSILON) * 100) / 100; }));
+        log(`<div class="pnl-head">ACCOUNTS (${accs.length})</div>`);
+        accs.forEach(a => {
+            const depth = (a.match(/:/g)||[]).length;
+            const color = total[a] < 0 ? 'var(--error)' : total[a] > 0 ? 'var(--success)' : 'var(--accent)';
+            log(`<div style="display:flex;justify-content:space-between;margin-left:${depth*12}px;font-size:0.9em"><span>${escapeHtml(a)}</span><span style="color:${color}">${fmtNum(total[a])}</span></div>`);
+        });
+    }
+    else if (verb === 'backup') {
+        const rawData = LedgerManager.getRaw();
+        if (args[0] === 'list') {
+            const backups = Persistence.listBackups();
+            if (!backups.length) { log('No auto-backups found.', 'system'); return; }
+            log(`<div class="pnl-head">AUTO-BACKUPS (${backups.length})</div>`);
+            backups.forEach(k => {
+                const ts = k.replace('HL_AUTOBACKUP_', '').replace('HL_SAFETY_BACKUP', 'safety');
+                const data = localStorage.getItem(k);
+                const lines = data ? data.split('\n').length : 0;
+                const safeClick = k.replace(/'/g, "\\'");
+                log(`<div class="help-cmd" style="cursor:pointer" onclick="if(confirm('Restore from backup ${ts}? Current data will be lost.')) { parseData(localStorage.getItem('${safeClick}')); LedgerManager.save(LedgerManager.getRaw()); log('Restored from backup.','success'); }"><span>${ts}</span><span style="color:var(--accent)">${lines} lines — click to restore</span></div>`);
+            });
+        } else if (args[0] === 'now') {
+            Persistence.autoBackup(rawData);
+            log(`✓ Manual backup created (${rawData.length} bytes).`, 'success');
+        } else {
+            log(`<div class="pnl-head">BACKUP STATUS</div>
+                <div class="stat-row"><span>Auto-backups stored</span><span>${Persistence.listBackups().length}</span></div>
+                <div class="stat-row"><span>Ledger size</span><span>${rawData.length} bytes</span></div>
+                <div class="stat-row"><span>Transactions</span><span>${transactions.length}</span></div>
+                <div class="help-cmd" style="margin-top:8px"><span>backup now</span><span>Create manual backup</span></div>
+                <div class="help-cmd"><span>backup list</span><span>View & restore backups</span></div>
+                <div class="help-cmd"><span>export</span><span>Download .hledger file</span></div>
+                <div class="help-cmd"><span>export copy</span><span>Copy to clipboard</span></div>`);
+        }
+    }
+    else if (verb === 'edit') { Editor.open(); }
+    else if (verb === 'recur') { 
+        const query = args.join(' '); 
+        if (!query) { log('Usage: recur <search term>', 'error'); return; }
+        const found = [...transactions].reverse().find(t => match(t, query)); 
+        if (found) { 
+            const today = new Date().toISOString().split('T')[0]; 
+            const postLines = found.posts.map(p => { 
+                if (p.isImplicit) return `    ${p.acc}`;
+                const amtStr = p.comm ? fmtAmt(p.val, p.comm, p.pos) : fmtNum(p.val);
+                // hledger spec: account and amount on same line, 2+ spaces apart
+                return `    ${p.acc}  ${amtStr}`;
+            }).join('\n'); 
+            const tpl = `\n${today} ${found.desc}\n${postLines}\n`; 
+            const newRaw = LedgerManager.getRaw() + tpl; 
+            LedgerManager.save(newRaw); 
+            LedgerManager.loadRaw(newRaw); 
+            log(`✓ Recurred: "${escapeHtml(found.desc)}" from ${found.date} (${found.posts.length} postings)`, 'success'); 
+        } else { log(`No transaction matching "${escapeHtml(query)}" found.`, 'error'); }
+    }
+    else if (verb === 'commodity') {
+        // commodity add SYMBOL — add a commodity directive
+        const sym = args[0] || args.join(' ').trim();
+        if (!sym) { log('Usage: commodity <SYMBOL>  e.g. commodity TRY', 'error'); return; }
+        if (availableCommodities.has(sym)) { log(`Commodity "${sym}" already known.`, 'warn'); return; }
+        directiveLines.push(`commodity ${sym}`);
+        const raw = reconstructFile(); LedgerManager.save(raw); parseData(raw);
+        log(`✓ Commodity "${sym}" added.`, 'success');
+    }
+    else if (verb === 'buy') {
+        // buy <qty> <COMM> [at|@] <price> <CURRENCY> [from <account>]  [into <account>]
+        // e.g. buy 80 AAPL @ 112.5 TRY
+        // e.g. buy 80 AAPL with 9000 TRY
+        // Parse: buy <qty> <COMM> [with|at|@] <totalOrPrice> <currency> [from <srcAcc>]
+        const rawArgs = val.slice(4).trim(); // everything after "buy "
+        // Regex: qty comm [with|at|@] amount currency [from account]
+        // commodity symbols: letters, digits, underscore (e.g. AAPL, TRY, BTC, USD)
+        const buyRe = /^([\d.]+)\s+([A-Za-z_][A-Za-z\d_]*)\s+(?:with|at|@)\s+([\d.,]+)\s*([A-Za-z$€£¥₺_][A-Za-z\d_]*)(?:\s+from\s+(.+))?$/i;
+        const bm = rawArgs.match(buyRe);
+        if (!bm) {
+            log(`Usage: buy &lt;qty&gt; &lt;COMM&gt; [at|with] &lt;price/total&gt; &lt;CURRENCY&gt; [from &lt;account&gt;]`, 'error');
+            log(`Example: buy 80 AAPL with 9000 TRY`, 'system');
+            log(`Example: buy 80 AAPL @ 112.5 TRY`, 'system');
+            return;
+        }
+        const qty = parseFloat(bm[1]);
+        const comm = bm[2].toUpperCase();
+        const amount = parseFloat(bm[3].replace(',',''));
+        const currency = bm[4].toUpperCase();
+        const srcAcc = bm[5] ? bm[5].trim() : 'assets:bank';
+        // "with" means total cost; "@" or "at" means per-unit price
+        const isTotal = /with/i.test(rawArgs);
+        const totalCost = isTotal ? amount : Math.round(amount * qty * 100) / 100;
+        const pricePerUnit = isTotal ? Math.round((amount / qty) * 100) / 100 : amount;
+        const today = new Date().toISOString().split('T')[0];
+        // Register new commodities as directives BEFORE reconstructing file
+        // hledger convention: commodity directives go at top
+        if (!availableCommodities.has(comm)) { directiveLines.push(`commodity ${comm}`); availableCommodities.add(comm); }
+        if (!availableCommodities.has(currency)) { directiveLines.push(`commodity ${currency}`); availableCommodities.add(currency); }
+        // hledger-spec transaction:
+        //   assets:investments  <qty> <COMM> @ <price> <CURRENCY>   ; debit: asset acquired
+        //   assets:bank         -<total> <CURRENCY>                  ; credit: cash paid out
+        const txnText = `\n${today} Buy ${qty} ${comm}\n    assets:investments  ${qty} ${comm} @ ${fmtNum(pricePerUnit)} ${currency}\n    ${srcAcc}  -${fmtNum(totalCost)} ${currency}\n`;
+        const newRaw = LedgerManager.getRaw() + txnText;
+        LedgerManager.save(newRaw); LedgerManager.loadRaw(newRaw);
+        log(`✓ Bought <b>${qty} ${escapeHtml(comm)}</b> @ ${fmtNum(pricePerUnit)} ${escapeHtml(currency)}/unit`, 'success');
+        log(`  Total cost: <b>${fmtNum(totalCost)} ${escapeHtml(currency)}</b> debited from <b>${escapeHtml(srcAcc)}</b>`, 'system');
+        log(`  Run <b>bal assets:investments</b> to see your portfolio.`, 'system');
+    }
+    else if (verb === 'waterfall') {
+        // Profit waterfall: Income → each Expense category → Net
+        // hledger convention: income postings are NEGATIVE (credit), expense postings are POSITIVE (debit)
+        // Net = income + expenses (both raw signs). Profit = income is more negative than expenses are positive.
+        const q = args.join(' ');
+        let rawIncome = 0;   // negative in hledger (credits)
+        const expByCategory = {};  // positive in hledger (debits)
+        transactions.filter(t => match(t, q)).forEach(t => {
+            t.posts.forEach(p => {
+                if (p.acc.startsWith('income'))   rawIncome = Math.round((rawIncome + p.val + Number.EPSILON)*100)/100;
+                if (p.acc.startsWith('expenses')) {
+                    const cat = p.acc.split(':').slice(0,2).join(':');
+                    expByCategory[cat] = Math.round(((expByCategory[cat]||0) + p.val + Number.EPSILON)*100)/100;
+                }
+            });
+        });
+        // Work in absolute / display values throughout
+        const absIncome = Math.abs(rawIncome);   // always positive display
+        const sortedExp = Object.entries(expByCategory)
+            .map(([cat, v]) => [cat, Math.abs(v)])   // abs of expense (they're debit=positive, display same)
+            .sort((a, b) => b[1] - a[1]);            // largest first
+        const totalExp = sortedExp.reduce((s, [, v]) => s + v, 0);
+        // Net profit (display): income minus expenses. Positive = profit, negative = loss.
+        const netProfit = Math.round((absIncome - totalExp) * 100) / 100;
+
+        if (absIncome === 0 && totalExp === 0) { log('No income or expense transactions match.', 'system'); return; }
+
+        // ── Chart geometry ──────────────────────────────────────────────
+        // Bar width and gap are fixed; total SVG width grows with step count.
+        // The Y-axis panel is rendered in a SEPARATE sticky SVG so it stays
+        // visible when the user scrolls the chart area horizontally.
+        const BAR_W = 44, GAP = 14, PAD_T = 28, PAD_B = 50, PAD_L = 0, PAD_R = 12;
+        const YAXIS_W = 54;   // width of the sticky left panel
+        const H = 230;
+        const chartH = H - PAD_T - PAD_B;
+        const fmtTick = v => {
+            const abs = Math.abs(v);
+            if (abs >= 1e6) return (v/1e6).toFixed(1)+'M';
+            if (abs >= 1e3) return (v/1e3).toFixed(1)+'k';
+            return v.toFixed(0);
+        };
+
+        // ── Build steps ─────────────────────────────────────────────────
+        // Values are in "display space":
+        //   Income bar:  base=0,        top=absIncome   (rises above zero line)
+        //   Expense bars: floating, decrease running level
+        //   Net bar:     base=0,        top=netProfit   (can be NEGATIVE → bar goes below zero)
+        const netColor = netProfit >= 0 ? 'var(--success)' : 'var(--error)';
+        const steps = [];
+        let runningTop = absIncome;
+
+        steps.push({ label: 'Income', absVal: absIncome, base: 0, top: absIncome,
+                     color: 'var(--success)', isNet: false });
+
+        sortedExp.forEach(([cat, expAmt]) => {
+            const newTop = runningTop - expAmt;
+            steps.push({
+                label: cat.replace('expenses:', ''),
+                absVal: expAmt,
+                base: newTop,          // may go negative if expenses > income
+                top:  runningTop,
+                color: 'var(--error)', isNet: false
+            });
+            runningTop = newTop;
+        });
+
+        // Net: goes from 0 to netProfit (positive = above zero, negative = below)
+        steps.push({ label: 'Net', absVal: netProfit, base: 0, top: netProfit,
+                     color: netColor, isNet: true });
+
+        const totalSteps = steps.length;
+
+        // ── Y-axis range ─────────────────────────────────────────────────
+        // Must include 0, absIncome, and netProfit (which may be negative)
+        const allVals = steps.flatMap(s => [s.base, s.top]);
+        const dataMin = Math.min(0, ...allVals);
+        const dataMax = Math.max(0, ...allVals);
+        const { min: yMin, max: yMax, ticks } = GraphEngine.getNiceTicks(dataMin, dataMax, 5);
+        const yRange = yMax - yMin;
+
+        // yPx: converts a data-space value → SVG pixel y (0 at top)
+        const yPx = v => PAD_T + chartH - ((v - yMin) / yRange) * chartH;
+        const zeroY = yPx(0);  // pixel y of the zero line
+
+        // ── SVG width: grows with number of steps ────────────────────────
+        const svgW = PAD_L + totalSteps * (BAR_W + GAP) + GAP + PAD_R;
+
+        let svgBars = '', svgLabels = '', svgVals = '';
+
+        steps.forEach((step, i) => {
+            const x = PAD_L + GAP + i * (BAR_W + GAP);
+
+            // Bar: from yPx(step.top) to yPx(step.base)
+            // When top > base (normal): bar goes upward
+            // When top < base (overshot negative): bar still renders correctly
+            const yTop  = yPx(Math.max(step.top, step.base));
+            const yBot  = yPx(Math.min(step.top, step.base));
+            const barH  = Math.max(2, yBot - yTop);
+
+            svgBars += `<rect x="${x}" y="${yTop.toFixed(1)}" width="${BAR_W}" height="${barH.toFixed(1)}" fill="${step.color}" opacity="0.85" rx="2"/>`;
+
+            // Connector: dashed horizontal line at the "new level" (step.base) leading to next bar
+            if (!step.isNet && i < totalSteps - 1) {
+                const levelY = yPx(step.base).toFixed(1);
+                const nextX  = x + BAR_W + GAP;
+                svgBars += `<line x1="${x + BAR_W}" y1="${levelY}" x2="${nextX}" y2="${levelY}" stroke="var(--ghost)" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
+            }
+
+            // X label — rotated 35° so long names fit
+            const labelX = x + BAR_W / 2;
+            const labelY = H - PAD_B + 14;
+            svgLabels += `<text transform="rotate(-35,${labelX},${labelY})" x="${labelX}" y="${labelY}" text-anchor="end" class="x-label" style="font-size:9px">${escapeHtml(step.label)}</text>`;
+
+            // Value label: above bar if positive, below bar if negative net
+            const signedVal = step.isNet ? step.absVal : step.absVal;
+            const dispVal = (step.isNet && netProfit < 0 ? '−' : '') + fmtTick(Math.abs(signedVal));
+            const valY = step.isNet && netProfit < 0 ? yBot + 12 : yTop - 4;
+            svgVals += `<text x="${(x + BAR_W/2).toFixed(1)}" y="${valY.toFixed(1)}" text-anchor="middle" style="fill:var(--text);font-size:9px;font-family:var(--font)">${escapeHtml(dispVal)}</text>`;
+        });
+
+        // Zero line (bold, always visible)
+        svgBars += `<line x1="0" y1="${zeroY.toFixed(1)}" x2="${svgW}" y2="${zeroY.toFixed(1)}" stroke="var(--accent)" stroke-width="1.5" opacity="0.7"/>`;
+
+        // ── Y-axis (sticky panel, separate SVG) ──────────────────────────
+        let yAxisSvg = '';
+        ticks.forEach(v => {
+            const y = yPx(v);
+            const isZero = Math.abs(v) < 1e-9;
+            yAxisSvg += `<text x="${YAXIS_W - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="x-label" style="${isZero ? 'font-weight:bold;fill:var(--accent)' : ''}">${escapeHtml(fmtTick(v))}</text>`;
+            yAxisSvg += `<line x1="${YAXIS_W - 2}" y1="${y.toFixed(1)}" x2="${YAXIS_W}" y2="${y.toFixed(1)}" stroke="var(--accent)" stroke-opacity="0.4" stroke-width="1"/>`;
+        });
+        // Y-axis spine
+        yAxisSvg += `<line x1="${YAXIS_W - 1}" y1="${PAD_T}" x2="${YAXIS_W - 1}" y2="${PAD_T + chartH}" stroke="var(--accent)" stroke-opacity="0.3" stroke-width="1"/>`;
+
+        // Gridlines in the scrollable chart (rendered at svgW width)
+        let gridLines = '';
+        ticks.forEach(v => {
+            const y = yPx(v);
+            gridLines += `<line x1="0" y1="${y.toFixed(1)}" x2="${svgW}" y2="${y.toFixed(1)}" class="grid-line"/>`;
+        });
+
+        // Summary table
+        const pctStr = absIncome > 0 ? ` (${(netProfit/absIncome*100).toFixed(1)}% margin)` : '';
+        const summaryRows = [
+            `<div class="stat-row"><span style="color:var(--success)">▲ Total Income</span><span style="color:var(--success);font-weight:bold">${fmtNum(absIncome)}</span></div>`,
+            ...sortedExp.map(([cat, v]) => `<div class="stat-row" style="font-size:0.9em"><span style="color:var(--ghost);padding-left:8px">↳ ${escapeHtml(cat.replace('expenses:',''))}</span><span style="color:var(--error)">−${fmtNum(v)}</span></div>`),
+            `<div class="stat-row" style="border-top:1px solid var(--accent);margin-top:4px;padding-top:4px"><span style="color:var(--accent)">▼ Total Expenses</span><span style="color:var(--error)">−${fmtNum(totalExp)}</span></div>`,
+            `<div class="stat-row pnl-total"><span>Net Profit${pctStr}</span><span style="color:${netColor};font-weight:bold">${netProfit >= 0 ? '' : '−'}${fmtNum(Math.abs(netProfit))}</span></div>`
+        ].join('');
+
+        const html = `<div class="graph-container" style="padding:0;overflow:hidden">
+            <div style="padding:12px 12px 6px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">PROFIT WATERFALL${q ? ' — ' + escapeHtml(q) : ''}</span>
+                <div style="display:flex;gap:8px;align-items:center;font-size:10px">
+                    <span style="color:var(--success)">▉ Income</span>
+                    <span style="color:var(--error)">▉ Expense</span>
+                    <span style="color:${netColor}">▉ Net</span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:flex-start">
+                <!-- Sticky Y-axis panel -->
+                <svg width="${YAXIS_W}" height="${H}" style="flex-shrink:0;overflow:visible">
+                    ${yAxisSvg}
+                </svg>
+                <!-- Scrollable chart area -->
+                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;cursor:grab" id="wf-scroll-${Date.now()}">
+                    <svg width="${svgW}" height="${H}" style="display:block;min-width:${svgW}px">
+                        ${gridLines}${svgBars}${svgLabels}${svgVals}
+                    </svg>
+                </div>
+            </div>
+            <div style="padding:8px 12px">
+                ${summaryRows}
+            </div>
+        </div>`;
+        log(html);
+    }
+    else if (verb === 'alias') {         if (args[0] === 'add') { 
+            if (LedgerManager.addAlias(args[1], args[2])) log(`✓ Alias "${args[1]}" → "${args[2]}" added.`, 'success'); 
+        } else if (args[0] === 'list') { 
+            const aliases = Object.entries(fileAliases);
+            if (!aliases.length) { log('No aliases defined.', 'system'); return; }
+            log(`<div class="pnl-head">ALIASES (${aliases.length})</div>`);
+            aliases.forEach(([k,v]) => log(`<div class="stat-row"><span style="color:var(--warn)">${escapeHtml(k)}</span><span>→ ${escapeHtml(v)}</span></div>`)); 
+        } else if (args[0] === 'rm') {
+            if (!args[1]) { log('Usage: alias rm <alias-name>', 'error'); return; }
+            // Remove from directiveLines
+            const before = directiveLines.length;
+            directiveLines = directiveLines.filter(l => !l.match(new RegExp(`^alias\\s+${args[1].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*=`)));
+            if (directiveLines.length < before) {
+                const raw = reconstructFile(); LedgerManager.save(raw); parseData(raw);
+                log(`✓ Alias "${args[1]}" removed.`, 'success');
+            } else { log(`Alias "${args[1]}" not found.`, 'error'); }
+        } else { log('Usage: alias [add|list|rm]', 'system'); }
+    }
+    else if (verb === 'undo') { 
+        if (transactions.length === 0) { log("Nothing to undo.", 'warn'); return; } 
+        // Backup before undo
+        Persistence.autoBackup(LedgerManager.getRaw());
+        // Remove the last transaction by date order (most recently entered or latest date)
+        const lastIdx = transactions.reduce((best, t, i) => 
+            t.date > transactions[best].date ? i : best, 0);
+        const removed = transactions.splice(lastIdx, 1)[0];
+        // Re-number IDs
+        transactions.forEach((t, i) => t.id = i);
+        const safeRaw = reconstructFile(); 
+        LedgerManager.save(safeRaw); 
+        LedgerManager.loadRaw(safeRaw); 
+        log(`✓ Undone: "${escapeHtml(removed?.desc || 'last entry')}" (${removed?.date}). Backup saved.`, 'success'); 
+    }
+    else if (verb === 'assert') { if (args.length >= 2) { LedgerManager.addAssertion(args[0], args[1]); log(`Assertion added for ${args[0]}.`, 'success'); } else log("Usage: assert <acc> <amount>", 'error'); }
+    else if (verb === 'pnl') { 
+        const q = args.join(' '); 
+        let inc = 0, exp = 0;
+        const incByAcc = {}, expByAcc = {};
+        transactions.filter(t => match(t, q)).forEach(t => { 
+            t.posts.forEach(p => { 
+                if (p.acc.startsWith('income')) { 
+                    inc = Math.round((inc + p.val + Number.EPSILON) * 100) / 100;
+                    incByAcc[p.acc] = Math.round(((incByAcc[p.acc] || 0) + p.val + Number.EPSILON) * 100) / 100;
+                } 
+                if (p.acc.startsWith('expenses')) { 
+                    exp = Math.round((exp + p.val + Number.EPSILON) * 100) / 100;
+                    expByAcc[p.acc] = Math.round(((expByAcc[p.acc] || 0) + p.val + Number.EPSILON) * 100) / 100;
+                } 
+            }); 
+        });
+        const net = Math.round((inc + exp + Number.EPSILON) * 100) / 100;
+        const savingsRate = Math.abs(inc) > 0.01 ? (net / Math.abs(inc) * 100) : 0;
+        const netColor = net >= 0 ? 'var(--success)' : 'var(--error)';
+        
+        let html = `<div class="pnl-head">INCOME STATEMENT${q ? ' — ' + escapeHtml(q) : ''}</div>`;
+        // Income breakdown
+        html += `<div class="pnl-row"><span style="color:var(--success);font-weight:bold">INCOME</span><span style="color:var(--success)">${fmtNum(Math.abs(inc))}</span></div>`;
+        Object.entries(incByAcc).sort((a,b) => a[1]-b[1]).forEach(([acc, val]) => {
+            if (Math.abs(val) < 0.005) return;
+            const pct = Math.abs(inc) > 0 ? (Math.abs(val) / Math.abs(inc) * 100).toFixed(0) : 0;
+            html += `<div class="pnl-row" style="margin-left:12px;font-size:0.88em"><span style="color:var(--ghost)">${escapeHtml(acc.replace('income:',''))}</span><span>${fmtNum(Math.abs(val))} <span style="color:var(--ghost);font-size:10px">${pct}%</span></span></div>`;
+        });
+        // Expenses breakdown
+        html += `<div class="pnl-row" style="margin-top:8px"><span style="color:var(--error);font-weight:bold">EXPENSES</span><span style="color:var(--error)">${fmtNum(Math.abs(exp))}</span></div>`;
+        Object.entries(expByAcc).sort((a,b) => b[1]-a[1]).forEach(([acc, val]) => {
+            if (Math.abs(val) < 0.005) return;
+            const pct = Math.abs(exp) > 0 ? (Math.abs(val) / Math.abs(exp) * 100).toFixed(0) : 0;
+            html += `<div class="pnl-row" style="margin-left:12px;font-size:0.88em"><span style="color:var(--ghost)">${escapeHtml(acc.replace('expenses:',''))}</span><span>${fmtNum(Math.abs(val))} <span style="color:var(--ghost);font-size:10px">${pct}%</span></span></div>`;
+        });
+        const netDisplay = Math.round((Math.abs(inc) - Math.abs(exp) + Number.EPSILON) * 100) / 100;
+        const netDisplayColor = netDisplay >= 0 ? 'var(--success)' : 'var(--error)';
+        html += `<div class="pnl-row pnl-total"><span>NET</span><span style="color:${netDisplayColor}">${fmtNum(netDisplay)}</span></div>`;
+        if (Math.abs(inc) > 0.01) {
+            const srDisplay = (netDisplay / Math.abs(inc) * 100);
+            html += `<div class="pnl-row" style="font-size:0.85em"><span style="color:var(--accent)">Savings Rate</span><span style="color:${srDisplay >= 0 ? 'var(--success)' : 'var(--error)'}">${srDisplay.toFixed(1)}%</span></div>`;
+        }
+        log(html);
+    }
+    else if (verb === 'ledger') { if(args[0] === 'import') { pendingLedgerAction='import'; document.getElementById('file-input').click(); } else if(args[0] === 'merge') { pendingLedgerAction='merge'; document.getElementById('file-input').click(); } else if(args[0] === 'reset') { ConfirmationMode.start('Reset Ledger', () => { LedgerManager.reset(); }); } else if(args[0]==='new'||args[0]==='switch') { if (!args[1]) { log('Usage: ledger switch <name>', 'error'); } else { await LedgerManager.switch(args[1]); } } else log(LedgerManager.list().join(', '), 'system'); }
+    else if (verb === 'bal') { 
+        const q = args.join(' ');
+        const subset = transactions.filter(t => match(t, q));
+        if (!subset.length) { log('No matching transactions.', 'system'); return; }
+        const b = {};
+        // Commodity-aware balance tracking
+        const byCommodity = {}; // {account: {commodity: amount}}
+        subset.forEach(t => t.posts.forEach(p => {
+            const comm = p.comm || '';
+            if (!byCommodity[p.acc]) byCommodity[p.acc] = {};
+            byCommodity[p.acc][comm] = Math.round(((byCommodity[p.acc][comm] || 0) + p.val + Number.EPSILON) * 100) / 100;
+            b[p.acc] = Math.round(((b[p.acc] || 0) + p.val + Number.EPSILON) * 100) / 100;
+        }));
+        
+        // Build hierarchical tree with subtotals
+        const tree = {};
+        Object.keys(b).sort().forEach(acc => {
+            const parts = acc.split(':');
+            let node = tree;
+            parts.forEach(part => {
+                if (!node[part]) node[part] = { _val: 0, _comm: {}, _children: {}, _fullName: '' };
+                node = node[part]._children;
+            });
+        });
+        
+        // Calculate parent totals
+        const parentTotals = {};
+        Object.keys(b).sort().forEach(acc => {
+            const parts = acc.split(':');
+            for (let i = 1; i <= parts.length; i++) {
+                const parent = parts.slice(0, i).join(':');
+                parentTotals[parent] = Math.round(((parentTotals[parent] || 0) + b[acc] + Number.EPSILON) * 100) / 100;
+            }
+        });
+        
+        let html = `<div class="pnl-head">BALANCES${q ? ' — ' + escapeHtml(q) : ''}</div>`;
+        const accounts = Object.keys(b).sort();
+        let grandTotal = 0;
+        
+        // Group by root account for better display
+        const rootGroups = {};
+        accounts.forEach(acc => {
+            const root = acc.split(':')[0];
+            if (!rootGroups[root]) rootGroups[root] = [];
+            rootGroups[root].push(acc);
+        });
+        
+        Object.keys(rootGroups).sort().forEach(root => {
+            const rootAccs = rootGroups[root];
+            const rootTotal = rootAccs.reduce((s, acc) => Math.round((s + (b[acc]||0) + Number.EPSILON)*100)/100, 0);
+            if (Math.abs(rootTotal) < 0.005) return;
+            const isExpRoot = root === 'expenses';
+            const rootColor = rootTotal < 0 ? 'var(--error)' : rootTotal > 0 ? (isExpRoot ? 'var(--error)' : 'var(--success)') : 'var(--accent)';
+            html += `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;margin-top:4px;border-top:1px solid var(--panel)">
+                <span style="color:var(--primary);font-weight:bold;text-transform:uppercase;font-size:0.85em">${escapeHtml(root)}</span>
+                <span style="color:${rootColor};font-family:var(--font);font-weight:bold">${fmtNum(rootTotal)}</span>
+            </div>`;
+            
+            rootAccs.forEach(acc => {
+                const val = b[acc];
+                if (Math.abs(val) < 0.005) return;
+                grandTotal = Math.round((grandTotal + val + Number.EPSILON) * 100) / 100;
+                const depth = (acc.match(/:/g) || []).length;
+                const indent = (depth) * 12;
+                const isExpRoot = root === 'expenses';
+                const color = val < 0 ? 'var(--error)' : val > 0 ? (isExpRoot ? 'var(--error)' : 'var(--success)') : 'var(--accent)';
+                // Show commodity if non-default
+                const comms = byCommodity[acc] || {};
+                const commKeys = Object.keys(comms);
+                // Find the commodity position from a transaction
+                const commPos = commKeys.length === 1 ? (transactions.find(t => t.posts.find(p => p.acc === acc && p.comm === commKeys[0]))?.posts?.find(p => p.acc === acc)?.pos || 'left') : 'left';
+                const amtDisplay = commKeys.length === 1 && commKeys[0] !== '' 
+                    ? fmtAmt(val, commKeys[0], commPos)
+                    : fmtNum(val);
+                const shortName = acc.split(':').slice(1).join(':') || acc;
+                html += `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;font-size:0.9em">
+                    <span style="margin-left:${indent}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;color:var(--text)">${escapeHtml(shortName)}</span>
+                    <span style="color:${color};font-family:var(--font)">${escapeHtml(amtDisplay)}</span>
+                </div>`;
+            });
+        });
+        
+        // Grand total line — only meaningful when multiple roots are shown
+        const numRoots = Object.keys(rootGroups).length;
+        if (numRoots > 1) {
+            const totalColor = grandTotal < 0 ? 'var(--error)' : grandTotal > 0 ? 'var(--success)' : 'var(--accent)';
+            html += `<div style="border-top:1px solid var(--accent);margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;font-weight:bold">
+                <span>Net Total</span><span style="color:${totalColor}">${fmtNum(grandTotal)}</span></div>`;
+        }
+        log(html);
+    }
+    else if (verb === 'coa') { renderCOA(args.join(' ')); }
+    else if (verb === 'export') { 
+        const rawData = LedgerManager.getRaw(); 
+        if (!rawData || rawData.trim().length === 0) { log("Error: Nothing to export.", 'error'); return; }
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const ledgerName = LedgerManager.current;
+        if (args[0] === 'copy') { 
+            navigator.clipboard.writeText(rawData).then(() => { toast(`✓ Copied ${rawData.split('\n').length} lines to clipboard`); log(`✓ ${rawData.split('\n').length} lines copied to clipboard.`, 'success'); })
+                .catch(() => log("Clipboard write failed. Try export file instead.", 'error')); 
+        } else if (args[0] === 'csv') { 
+            let csv = "Date,Status,Description,Account,Amount,Commodity,Comment\n"; 
+            transactions.forEach(t => { 
+                t.posts.forEach(p => { 
+                    const row = [
+                        t.date, 
+                        t.flag || '', 
+                        `"${(t.desc||'').replace(/"/g, '""')}"`, 
+                        `"${p.acc}"`,
+                        fmtNum(p.val), 
+                        p.comm || '',
+                        `"${(p.comment||'').replace(/;/g,'').trim()}"`
+                    ]; 
+                    csv += row.join(",") + "\n"; 
+                }); 
+            }); 
+            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'}); 
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = `${ledgerName}_${ts}.csv`; 
+            a.click(); 
+            URL.revokeObjectURL(a.href);
+            log(`✓ CSV exported: ${transactions.length} transactions.`, 'success'); 
+        } else if (args[0] === 'json') {
+            const json = JSON.stringify({ 
+                exported: new Date().toISOString(),
+                ledger: ledgerName,
+                transactions: transactions.map(t => ({
+                    id: t.id, date: t.date, flag: t.flag, desc: t.desc,
+                    tags: t.tags,
+                    postings: t.posts.map(p => ({ account: p.acc, amount: p.val, commodity: p.comm || '', implicit: p.isImplicit }))
+                }))
+            }, null, 2);
+            const blob = new Blob([json], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${ledgerName}_${ts}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            log(`✓ JSON exported: ${transactions.length} transactions.`, 'success');
+        } else { 
+            // Pre-export validation
+            const checkResult = transactions.filter(t => t._error);
+            if (checkResult.length > 0) {
+                log(`⚠ Warning: ${checkResult.length} transactions have errors. Run 'check' first. Exporting anyway...`, 'warn');
+            }
+            const blob = new Blob([rawData], {type: 'text/plain;charset=utf-8'}); 
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = `${ledgerName}_${ts}.hledger`; 
+            a.click(); 
+            URL.revokeObjectURL(a.href);
+            log(`✓ Exported: ${ledgerName}_${ts}.hledger (${transactions.length} transactions, ${rawData.length} bytes)`, 'success'); 
+            ConfigManager.resetTxnCount(); 
+        } 
+    }
+    else if (verb === 'net') {
+        // Shorthand: show net worth (assets + liabilities)
+        let assets = 0, liab = 0;
+        transactions.forEach(t => t.posts.forEach(p => {
+            if (p.acc.startsWith('assets')) assets = Math.round((assets + p.val + Number.EPSILON)*100)/100;
+            else if (p.acc.startsWith('liabilities')) liab = Math.round((liab + p.val + Number.EPSILON)*100)/100;
+        }));
+        const net = Math.round((assets + liab + Number.EPSILON)*100)/100;
+        const c = net >= 0 ? 'var(--success)' : 'var(--error)';
+        log(`<div class="pnl-head">NET WORTH</div>
+            <div class="stat-row"><span style="color:var(--success)">Assets</span><span>${fmtNum(assets)}</span></div>
+            <div class="stat-row"><span style="color:var(--error)">Liabilities</span><span>${fmtNum(liab)}</span></div>
+            <div class="pnl-total" style="display:flex;justify-content:space-between;"><span>Net Worth</span><span style="color:${c}">${fmtNum(net)}</span></div>`);
+    }
+    else if (verb === 'add') { Editor.open(args.join(' ') || undefined); }
+    else if (verb === 'clear') { content.innerHTML = ''; }
+    else if (verb === 'history') {
+        if (!CmdHistory.list.length) { log('No history yet.', 'system'); return; }
+        const n = parseInt(args[0]) || 20;
+        let html = `<div class="search-count">Last ${Math.min(n, CmdHistory.list.length)} commands</div>`;
+        CmdHistory.list.slice(0, n).forEach((cmd, i) => {
+            const safe = escapeHtml(cmd).replace(/'/g, '&#39;');
+            html += `<div class="help-cmd" style="cursor:pointer" onmousedown="event.preventDefault()" onclick="input.value=${JSON.stringify(cmd)};input.focus();updatePrediction()"><span style="color:var(--accent);min-width:24px;display:inline-block">${i+1}</span><span>${escapeHtml(cmd)}</span></div>`;
+        });
+        log(html);
+    }
+    else if (verb === 'help') { 
+        const h = (cat, cmds) => `<div class="help-cat">${cat}</div>` + cmds.map(c => `<div class="help-cmd"><span>${c[0]}</span><span>${c[1]}</span></div>`).join(''); 
+        let html = h('LEARN', [
+            ['tutorial', 'Interactive guide'],
+            ['tutorial tips', 'Power user tips'],            ['tutorial backup', 'Backup & sync guide'],
+            ['?', 'Keyboard shortcuts']
+        ]); 
+        html += h('VIEWS', [
+            ['dash', 'Dashboard: net worth + monthly'],
+            ['net', 'Net worth summary (assets - liabilities)'],
+            ['recent [N]', 'Last N transactions'],
+            ['reg [filter]', 'Register with running balance'],
+            ['bal [filter]', 'Hierarchical balances by account'],
+            ['pnl [filter]', 'Income statement with breakdown'],
+            ['waterfall [filter]', 'Income→Expenses→Net profit waterfall chart'],
+            ['accounts [filter]', 'All accounts with balances'],
+            ['tags', 'All tags and usage counts'],
+            ['trend [account]', 'Month-over-month trend'],
+            ['forecast [days]', 'Recurring payment forecast'],
+            ['coa [filter]', 'Chart of accounts — opens batch editor'],
+            ['graph [accs] [opts]', 'Charts: line/area/bar/scatter/donut'],
+            ['graph expenses type:bar by:month', 'Example: monthly expense bars'],
+            ['graph income expenses type:donut', 'Example: income vs expense donut'],
+            ['graph assets cum', 'Example: cumulative net worth line']
+        ]); 
+        html += h('SEARCH & FILTERS', [
+            ['search <text>', 'Full-text search'],
+            ['reg date:thismonth', 'This month (also: thisweek, q1-q4, lastmonth)'],
+            ['bal assets date:thisyear', 'Date-filtered balance'],
+            ['reg date:2024-01..2024-06', 'Date range filter'],
+            ['bal -liabilities', 'Exclude accounts'],
+            ['reg amt:>100', 'Amount filter (>, <, >=, <=, =)'],
+            ['reg tag:food', 'Tag filter'],
+            ['reg desc:grocery', 'Description filter'],
+            ['reg acc:expenses:food', 'Account filter'],
+            ['reg flag:*', 'Cleared transactions only']
+        ]); 
+        html += h('ENTRY', [
+            ['add', 'Smart Editor (preferred)'],
+            ['buy &lt;qty&gt; &lt;COMM&gt; [with|at] &lt;amt&gt; &lt;CCY&gt;', 'Quick stock/commodity purchase'],
+            ['buy 80 AAPL with 9000 TRY', 'Example: 80 AAPL using total TRY cost'],
+            ['commodity &lt;SYM&gt;', 'Register commodity (e.g. TRY, AAPL, BTC)'],
+            ['recur &lt;desc&gt;', 'Repeat a past transaction'],
+            ['undo', 'Revert last entry (auto-backup first)'],
+            ['rm &lt;id&gt;', 'Delete by ID (with confirmation)'],
+            ['assert &lt;acc&gt; &lt;amt&gt;', 'Add balance assertion'],
+            ['account add &lt;n&gt;', 'Add account to chart']
+        ]); 
+        html += h('DATA & BACKUP', [
+            ['install', 'Install Ledgie as a native app (offline-capable)'],
+            ['pwa status', 'Show PWA / Service Worker status'],
+            ['pwa update', 'Check for app update'],
+            ['remount', 'Re-link previously mounted file silently'],
+            ['unmount', 'Disconnect file & forget the link'],
+            ['export', 'Download .hledger file (timestamped)'],
+            ['export csv', 'Download as CSV'],
+            ['export json', 'Download as JSON'],
+            ['export copy', 'Copy raw ledger to clipboard'],
+            ['backup now', 'Manual auto-backup'],
+            ['backup list', 'View and restore auto-backups'],
+            ['ledger list', 'List all ledgers'],
+            ['ledger switch <name>', 'Switch ledger'],
+            ['ledger merge', 'Import and merge another file'],
+            ['check', 'Validate all transactions + assertions'],
+            ['stats', 'Ledger statistics']
+        ]); 
+        html += h('CONFIG', [
+            ['config list', 'Show all settings'],
+            ['config strict', 'Toggle strict validation mode'],
+            ['config theme solarized', 'Set theme (matrix/dracula/paper/solarized/catppuccin/nord/monokai)'],
+            ['config theme reset', 'Reset to default theme'],
+            ['config budget set food 500', 'Set monthly budget for a category'],
+            ['config budget list', 'View budgets & progress'],
+            ['config budget rm food', 'Remove a budget'],
+            ['config set safety_word YES', 'Change confirmation word'],
+            ['config set backup_reminder 5', 'Change backup reminder interval'],
+        ]);
+        html += h('ALIASES', [
+            ['alias add <key> <account>', 'Add account alias'],
+            ['alias list', 'List all aliases'],
+            ['alias rm <key>', 'Remove alias'],
+        ]);
+        html += h('KEYS', [['↑ ↓', 'Command history'],['Tab / →', 'Autocomplete'],['Ctrl+L', 'Clear screen'],['d / r / b', 'dash/recent/bal (empty input)'],['n', 'New transaction (add)'],['p', 'P&L statement'],['?', 'Quick reference']]); 
+        log(html); 
+    }
+    else { log(`Unknown command: <b>${escapeHtml(verb)}</b>. Type <span style="cursor:pointer;color:var(--primary)" onclick="run('help')">help</span> or press <span style="cursor:pointer;color:var(--primary)" onclick="toggleKeys()">?</span> for reference.`, 'error'); }
+}
+
+function logRow(label, val, comm, pos) { 
+    const color = val < 0 ? 'var(--error)' : val > 0 ? 'var(--success)' : 'var(--accent)';
+    const amtStr = comm ? fmtAmt(val, comm, pos || 'right') : fmtNum(val);
+    log(`<div style="display:flex;justify-content:space-between;font-size:0.95em"><span>${escapeHtml(String(label))}</span><span style="color:${color}">${escapeHtml(amtStr)}</span></div>`); 
+}
+
+/* =========================================
+   COA BATCH EDITOR
+   ========================================= */
+const COAEditor = {
+    filterText: '',
+    activeRoot: null,
+
+    open(filterArg) {
+        this.filterText = filterArg || '';
+        this.activeRoot = null;
+        const searchEl = document.getElementById('coa-search');
+        if (searchEl) searchEl.value = this.filterText;
+        this._buildTabs();
+        this.render();
+        document.getElementById('coa-modal').classList.add('open');
+    },
+
+    close() {
+        document.getElementById('coa-modal').classList.remove('open');
+    },
+
+    filter(val) {
+        this.filterText = val.toLowerCase().trim();
+        this._buildTabs();
+        this.render();
+    },
+
+    setRoot(root) {
+        this.activeRoot = root;
+        this._buildTabs();
+        this.render();
+    },
+
+    _buildTabs() {
+        const container = document.getElementById('coa-tabs');
+        if (!container) return;
+        const roots = this._getRootsWithCounts();
+        const ft = this.filterText;
+
+        let html = `<div class="coa-tab${!this.activeRoot ? ' active' : ''}" onclick="COAEditor.setRoot(null)">
+            All <span class="coa-tab-badge">${ENGINE.accounts.length}</span>
+        </div>`;
+
+        FIXED_ROOTS.forEach(root => {
+            const count = roots[root] || 0;
+            const isActive = this.activeRoot === root;
+            html += `<div class="coa-tab${isActive ? ' active' : ''}" onclick="COAEditor.setRoot('${root}')">
+                ${root.charAt(0).toUpperCase() + root.slice(1)}
+                <span class="coa-tab-badge">${count}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    },
+
+    _getRootsWithCounts() {
+        const counts = {};
+        ENGINE.accounts.forEach(acc => {
+            const root = acc.split(':')[0];
+            counts[root] = (counts[root] || 0) + 1;
+        });
+        return counts;
+    },
+
+    _balances() {
+        const b = {};
+        transactions.forEach(t => t.posts.forEach(p => {
+            b[p.acc] = Math.round(((b[p.acc] || 0) + p.val + Number.EPSILON) * 100) / 100;
+        }));
+        return b;
+    },
+
+    _txnCount(acc) {
+        return transactions.filter(t => t.posts.some(p => p.acc === acc || p.acc.startsWith(acc + ':'))).length;
+    },
+
+    _directTxnCount(acc) {
+        return transactions.filter(t => t.posts.some(p => p.acc === acc)).length;
+    },
+
+    render() {
+        const container = document.getElementById('coa-tree');
+        if (!container) return;
+        // Clear inline forms
+        document.querySelectorAll('.coa-edit-panel').forEach(el => el.remove());
+
+        const ft = this.filterText;
+        const balances = this._balances();
+
+        const rootsToShow = this.activeRoot ? [this.activeRoot] : FIXED_ROOTS;
+
+        // Build filtered account list per root
+        const rootGroups = {};
+        FIXED_ROOTS.forEach(r => rootGroups[r] = []);
+        ENGINE.accounts.forEach(acc => {
+            const root = acc.split(':')[0];
+            if (!rootGroups[root]) rootGroups[root] = [];
+            if (!ft || acc.toLowerCase().includes(ft)) {
+                rootGroups[root].push(acc);
+            }
+        });
+
+        const ICONS = { assets: '◈', liabilities: '◆', equity: '◇', income: '▲', expenses: '▼' };
+        let html = '';
+
+        rootsToShow.forEach(root => {
+            const accs = (rootGroups[root] || []).slice().sort();
+            // Aggregate balance for root
+            const rootBal = accs.reduce((s, a) => s + (balances[a] || 0), 0) + (balances[root] || 0);
+            const rootBalColor = rootBal < 0 ? 'var(--error)' : rootBal > 0 ? 'var(--success)' : 'var(--ghost)';
+            const icon = ICONS[root] || '○';
+
+            html += `<div class="coa-section" id="coa-sect-${root}">
+                <div class="coa-section-header">
+                    <span class="coa-section-icon" style="color:${rootBalColor}">${icon}</span>
+                    <span class="coa-section-name">${root}</span>
+                    <span class="coa-section-bal" style="color:${rootBalColor}">${Math.abs(rootBal) > 0.005 ? fmtNum(rootBal) : ''}</span>
+                    <button class="coa-section-add" onclick="COAEditor.promptAdd('${root}')">+ Add</button>
+                </div>`;
+
+            if (!accs.length) {
+                html += `<div class="coa-empty">No accounts${ft ? ' matching filter' : ''}.</div>`;
+            } else {
+                accs.forEach(acc => { html += this._renderRow(acc, balances); });
+            }
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
+    },
+
+    _renderRow(acc, balances) {
+        const depth = (acc.match(/:/g) || []).length;
+        const shortName = acc.split(':').pop();
+        const parentPath = acc.split(':').slice(0, -1).join(':');
+        const bal = balances[acc] || 0;
+        const balColor = bal < 0 ? 'var(--error)' : bal > 0 ? 'var(--success)' : 'var(--ghost)';
+        const txnCount = this._directTxnCount(acc);
+        const totalTxnCount = this._txnCount(acc);
+        const hasChildren = ENGINE.accounts.some(a => a.startsWith(acc + ':'));
+        const safeAcc = acc.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        // Build tree indent: guide lines for all ancestor levels, elbow at own level
+        let indentHtml = `<div style="width:1rem;flex-shrink:0"></div>`; // left margin
+        for (let d = 0; d < depth - 1; d++) {
+            indentHtml += `<div class="coa-tree-guide"></div>`;
+        }
+        if (depth > 0) {
+            indentHtml += `<div class="coa-tree-elbow"></div>`;
+        }
+
+        const balStr = Math.abs(bal) > 0.005 ? `<span style="color:${balColor}">${fmtNum(bal)}</span>` : '';
+        const txnBadge = txnCount > 0 ? `<span class="coa-txn-count" title="${txnCount} direct transactions">${txnCount}</span>` : '';
+
+        const addBtn = `<button class="coa-act add" onclick="COAEditor.promptAdd('${safeAcc}')" title="Add sub-account">+</button>`;
+        let actionBtn;
+        if (txnCount === 0 && !hasChildren) {
+            actionBtn = `<button class="coa-act del" onclick="COAEditor.deleteAccount('${safeAcc}')" title="Delete account">✕</button>`;
+        } else {
+            actionBtn = `<button class="coa-act reg" onclick="COAEditor.showUsage('${safeAcc}')" title="View register (${totalTxnCount} txns)">≡</button>`;
+        }
+
+        return `<div class="coa-row" id="coa-row-${acc.replace(/[:.]/g,'_')}">
+            <div class="coa-row-indent">${indentHtml}</div>
+            <div class="coa-row-main" onclick="COAEditor.promptRename('${safeAcc}')" title="Click to rename">
+                <div class="coa-row-name">${escapeHtml(shortName)}</div>
+                ${depth > 0 ? `<div class="coa-row-path">${escapeHtml(parentPath)}</div>` : ''}
+            </div>
+            <div class="coa-row-bal">${balStr}</div>
+            <div class="coa-row-actions">${txnBadge}${addBtn}${actionBtn}</div>
+        </div>`;
+    },
+
+    _insertPanel(afterId, html) {
+        document.querySelectorAll('.coa-edit-panel').forEach(el => el.remove());
+        const anchor = document.getElementById(afterId);
+        if (!anchor) return null;
+        const div = document.createElement('div');
+        div.className = 'coa-edit-panel';
+        div.innerHTML = html;
+        anchor.insertAdjacentElement('afterend', div);
+        return div;
+    },
+
+    promptAdd(parentAcc) {
+        const safeParent = parentAcc.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const formId = `coa-add-${Date.now()}`;
+        const rowId = `coa-row-${parentAcc.replace(/[:.]/g,'_')}`;
+        // For root sections, anchor to the section header
+        const anchorId = document.getElementById(rowId) ? rowId : `coa-sect-${parentAcc}`;
+
+        const panel = this._insertPanel(anchorId, `
+            <div class="coa-edit-panel-label">New sub-account under <b style="color:var(--primary)">${escapeHtml(parentAcc)}</b></div>
+            <div class="coa-edit-panel-row">
+                <span class="coa-edit-prefix">${escapeHtml(parentAcc)}:</span>
+                <input class="coa-input" id="${formId}" placeholder="sub-account-name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+            <div class="coa-edit-actions">
+                <button class="btn btn-primary" style="font-size:11px" onclick="COAEditor._doAdd('${safeParent}','${formId}')">Add Account</button>
+                <button class="btn btn-secondary" style="font-size:11px" onclick="this.closest('.coa-edit-panel').remove()">Cancel</button>
+            </div>
+        `);
+        if (!panel) return;
+        const inp = document.getElementById(formId);
+        if (inp) {
+            inp.focus();
+            inp.onkeydown = e => {
+                if (e.key === 'Enter') COAEditor._doAdd(parentAcc, formId);
+                if (e.key === 'Escape') panel.remove();
+            };
+        }
+    },
+
+    _doAdd(parentAcc, inputId) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        const sub = inp.value.trim().toLowerCase().replace(/\s+/g, '-');
+        if (!sub) { inp.classList.add('error'); inp.focus(); return; }
+        const fullAcc = `${parentAcc}:${sub}`;
+        if (ENGINE.accounts.includes(fullAcc)) {
+            inp.classList.add('error'); inp.title = 'Account already exists'; inp.focus(); return;
+        }
+        if (LedgerManager.addAccount(fullAcc)) {
+            log(`✓ Account added: <b>${escapeHtml(fullAcc)}</b>`, 'success');
+            inp.closest('.coa-edit-panel')?.remove();
+            this._buildTabs();
+            this.render();
+        }
+    },
+
+    promptRename(acc) {
+        const rowId = `coa-row-${acc.replace(/[:.]/g,'_')}`;
+        const row = document.getElementById(rowId);
+        if (!row) return;
+        row.classList.add('editing');
+
+        const shortName = acc.split(':').pop();
+        const parent = acc.split(':').slice(0, -1).join(':');
+        const txnCount = this._txnCount(acc);
+        const formId = `coa-rename-${Date.now()}`;
+        const safeAcc = acc.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        const warnHtml = txnCount > 0
+            ? `<span class="coa-edit-warn">⚠ Rewrites ${txnCount} transaction${txnCount !== 1 ? 's' : ''}</span>`
+            : '';
+
+        const panel = this._insertPanel(rowId, `
+            <div class="coa-edit-panel-label">Rename <b style="color:var(--primary)">${escapeHtml(acc)}</b></div>
+            <div class="coa-edit-panel-row">
+                ${parent ? `<span class="coa-edit-prefix">${escapeHtml(parent)}:</span>` : ''}
+                <input class="coa-input" id="${formId}" value="${escapeHtml(shortName)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                ${warnHtml}
+            </div>
+            <div class="coa-edit-actions">
+                <button class="btn btn-primary" style="font-size:11px" onclick="COAEditor._doRename('${safeAcc}','${formId}')">Save</button>
+                <button class="btn btn-secondary" style="font-size:11px" onclick="document.getElementById('${rowId}')?.classList.remove('editing');this.closest('.coa-edit-panel').remove()">Cancel</button>
+            </div>
+        `);
+        if (!panel) return;
+        const inp = document.getElementById(formId);
+        if (inp) {
+            inp.focus(); inp.select();
+            inp.onkeydown = e => {
+                if (e.key === 'Enter') COAEditor._doRename(acc, formId);
+                if (e.key === 'Escape') { row.classList.remove('editing'); panel.remove(); }
+            };
+        }
+    },
+
+    _doRename(oldAcc, inputId) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        const newSub = inp.value.trim().toLowerCase().replace(/\s+/g, '-');
+        if (!newSub) { inp.classList.add('error'); inp.focus(); return; }
+        const parts = oldAcc.split(':');
+        parts[parts.length - 1] = newSub;
+        const newAcc = parts.join(':');
+
+        document.getElementById(`coa-row-${oldAcc.replace(/[:.]/g,'_')}`)?.classList.remove('editing');
+
+        if (newAcc === oldAcc) { inp.closest('.coa-edit-panel')?.remove(); return; }
+        if (ENGINE.accounts.includes(newAcc)) {
+            inp.classList.add('error'); inp.title = `"${newAcc}" already exists`; inp.focus(); return;
+        }
+
+        let rewrites = 0;
+        transactions.forEach(t => t.posts.forEach(p => {
+            if (p.acc === oldAcc || p.acc.startsWith(oldAcc + ':')) {
+                const suffix = p.acc.slice(oldAcc.length);
+                p.acc = newAcc + suffix;
+                rewrites++;
+            }
+        }));
+        directiveLines = directiveLines.map(l => {
+            if (l.startsWith(`account ${oldAcc}`)) return l.replace(oldAcc, newAcc);
+            if (l.startsWith('alias ') && l.includes(` = ${oldAcc}`)) return l.replace(` = ${oldAcc}`, ` = ${newAcc}`);
+            return l;
+        });
+        Object.keys(fileAliases).forEach(k => {
+            if (fileAliases[k] === oldAcc || fileAliases[k].startsWith(oldAcc + ':')) {
+                fileAliases[k] = fileAliases[k].replace(oldAcc, newAcc);
+            }
+        });
+
+        const raw = reconstructFile();
+        LedgerManager.save(raw);
+        parseData(raw);
+        inp.closest('.coa-edit-panel')?.remove();
+        log(`✓ Renamed <b>${escapeHtml(oldAcc)}</b> → <b>${escapeHtml(newAcc)}</b> · ${rewrites} posting${rewrites !== 1 ? 's' : ''} updated`, 'success');
+        this._buildTabs();
+        this.render();
+    },
+
+    deleteAccount(acc) {
+        const txnCount = this._txnCount(acc);
+        if (txnCount > 0) { log(`Cannot delete "${escapeHtml(acc)}" — it has ${txnCount} transactions.`, 'error'); return; }
+        const hasChildren = ENGINE.accounts.some(a => a.startsWith(acc + ':'));
+        if (hasChildren) { log(`Cannot delete "${escapeHtml(acc)}" — it has sub-accounts.`, 'error'); return; }
+        directiveLines = directiveLines.filter(l => l !== `account ${acc}`);
+        const raw = reconstructFile();
+        LedgerManager.save(raw);
+        parseData(raw);
+        log(`✓ Deleted account: ${escapeHtml(acc)}`, 'success');
+        this._buildTabs();
+        this.render();
+    },
+
+    showUsage(acc) {
+        this.close();
+        setTimeout(() => run(`reg ${acc}`), 100);
+    },
+
+    addRootPrompt() {
+        const formId = `coa-newroot-${Date.now()}`;
+        // Find or create a panel at the top of the content
+        document.querySelectorAll('.coa-edit-panel').forEach(el => el.remove());
+        const container = document.getElementById('coa-tree');
+        const div = document.createElement('div');
+        div.className = 'coa-edit-panel';
+        div.innerHTML = `
+            <div class="coa-edit-panel-label">Add a new account</div>
+            <div class="coa-edit-panel-row">
+                <select class="coa-input" id="${formId}-root" style="min-width:120px;flex:none">
+                    ${FIXED_ROOTS.map(r => `<option value="${r}">${r}</option>`).join('')}
+                </select>
+                <span class="coa-edit-prefix">:</span>
+                <input class="coa-input" id="${formId}" placeholder="account:name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+            <div class="coa-edit-actions">
+                <button class="btn btn-primary" style="font-size:11px" onclick="COAEditor._doAddRoot('${formId}')">Add Account</button>
+                <button class="btn btn-secondary" style="font-size:11px" onclick="this.closest('.coa-edit-panel').remove()">Cancel</button>
+            </div>
+        `;
+        container.prepend(div);
+        document.getElementById(formId)?.focus();
+    },
+
+    _doAddRoot(formId) {
+        const root = document.getElementById(`${formId}-root`)?.value;
+        const rawSub = document.getElementById(formId)?.value.trim().toLowerCase().replace(/\s+/g, '-');
+        if (!root || !rawSub) return;
+        const fullAcc = `${root}:${rawSub}`;
+        if (LedgerManager.addAccount(fullAcc)) {
+            log(`✓ Account added: <b>${escapeHtml(fullAcc)}</b>`, 'success');
+            document.querySelector('.coa-edit-panel')?.remove();
+            this._buildTabs();
+            this.render();
+        }
+    }
+};
+window.COAEditor = COAEditor;
+window.HandleStore = HandleStore;
+// Expose banner handler so inline onclick can reach it
+window.Persistence = Persistence;
+
+function renderCOA(filter) {
+    COAEditor.open(filter);
+}
+
+/* =========================================
+   UI EVENTS & PREDICT
+   ========================================= */
+const availableContexts = ['all', 'acc', 'date', 'cmd', 'param'];
+function cycleContext() { const currIdx = availableContexts.indexOf(activeFilter); activeFilter = availableContexts[(currIdx + 1) % availableContexts.length]; ctxBadge.innerText = activeFilter.toUpperCase(); ctxBadge.title = {all:'All suggestions',acc:'Accounts only',date:'Dates only',cmd:'Commands only',param:'Params only'}[activeFilter]||''; input.focus(); updatePrediction(); }
+
+let ghostSuffix = '';
+function updatePrediction() {
+    const val = input.value; 
+    const lowerVal = val.toLowerCase();
+    let mathRes = MathEngine.eval(lowerVal);
+    if (mathRes === null && lowerVal.includes(' ')) { const lastToken = lowerVal.split(' ').pop(); mathRes = MathEngine.eval(lastToken); }
+    let result = { suggest: '', options: [] };
+    if (ConfirmationMode.active) { 
+        ghost.innerText = ''; tabBtn.classList.remove('visible'); 
+        result.options = [{text: ConfirmationMode.targetWord, type:'opt', icon:'✅'}, {text: 'cancel', type:'opt', icon:'❌'}]; 
+    } else { 
+        result = ENGINE.predict(val); 
+        ghostSuffix = result.suggest; 
+        if (ghostSuffix) { tabBtn.classList.add('visible'); ghost.innerHTML = `<span style="opacity:0">${val}</span>` + ghostSuffix; } 
+        else { tabBtn.classList.remove('visible'); ghost.innerHTML = ''; }
+    }
+    
+    let html = '';
+    if (mathRes !== null) { html += `<div class="chip math" onmousedown="event.preventDefault()" onclick="applyMath('${mathRes}')">= ${mathRes}</div>`; }
+    const filtered = activeFilter === 'all' ? result.options : result.options.filter(o => o.type === activeFilter);
+    filtered.slice(0, 15).forEach(opt => {
+        const priorityClass = opt.priority ? 'priority' : ''; const mathClass = opt.type === 'math' ? 'math' : ''; const icon = opt.icon ? `<i>${opt.icon}</i>` : '';
+        const displayLabel = escapeHtml(opt.display || opt.text);
+        html += `<div class="chip ${priorityClass} ${mathClass}" onmousedown="event.preventDefault()" onclick="completeChip('${opt.text}')">${icon}${displayLabel}</div>`; 
+    });
+    suggs.innerHTML = html;
+}
+
+window.applyMath = function(res) {
+    const val = input.value; 
+    if (MathEngine.eval(val) !== null) { input.value = res + ' '; } 
+    else { const parts = val.split(' '); parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + res + ' '; }
+    input.focus(); updatePrediction();
+};
+
+window.acceptGhost = function() { if (ghostSuffix) { input.value += ghostSuffix; ghostSuffix = ''; input.focus(); updatePrediction(); } };
+window.completeChip = (text) => { 
+    if (ConfirmationMode.active) { input.value = text; run(text); return; } 
+    const val = input.value; 
+    if (val.endsWith(' ')) { input.value += text + ' '; } 
+    else { const parts = val.split(' '); parts.pop(); input.value = (parts.length ? parts.join(' ') + ' ' : '') + text + ' '; }
+    input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); 
+};
+window.fill = (s) => { input.value += s + ' '; input.focus(); updatePrediction(); setTimeout(() => inputWrapper.scrollIntoView({behavior: "smooth", block: "end"}), 100); };
+fileInput.onchange = (e) => { 
+    const file = e.target.files[0]; 
+    if (!file) return; 
+    if (file.size > 10 * 1024 * 1024) { log(`File too large: ${(file.size/1024/1024).toFixed(1)}MB. Max 10MB.`, 'error'); return; }
+    const reader = new FileReader(); 
+    reader.onload = (ev) => { 
+        const txt = ev.target.result; 
+        if (!txt || txt.trim().length === 0) { log('File is empty.', 'error'); e.target.value = ''; return; }
+        // Quick sanity check: look for at least one date line
+        if (!/^\d{4}[-/.]\d{2}[-/.]\d{2}/m.test(txt)) {
+            log(`Warning: No transaction dates found in "${file.name}". Verify this is a ledger file.`, 'warn');
+        }
+        if (pendingLedgerAction === 'merge') { 
+            LedgerManager.merge(txt); 
+        } else { 
+            // Backup current data before import
+            Persistence.autoBackup(LedgerManager.getRaw());
+            LedgerManager.loadRaw(txt); 
+            log(`✓ Imported: ${file.name} (${txt.split('\n').length} lines, ${transactions.length} transactions). Previous data backed up.`, 'success'); 
+        } 
+        pendingLedgerAction = null; 
+        e.target.value = ''; 
+    }; 
+    reader.onerror = () => { log(`Failed to read file: ${file.name}`, 'error'); e.target.value = ''; };
+    reader.readAsText(file, 'UTF-8'); 
+};
+input.addEventListener('input', updatePrediction);
+input.addEventListener('keydown', (e) => { 
+    if (e.key === 'Tab' || e.key === 'ArrowRight') { e.preventDefault(); acceptGhost(); }
+    else if (e.key === 'Enter') { run(input.value); input.value = ''; CmdHistory.reset(); updatePrediction(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); const h = CmdHistory.up(); if (h !== null) { input.value = h; updatePrediction(); } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); const h = CmdHistory.dn(); input.value = h; updatePrediction(); }
+    else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); content.innerHTML = ''; }
+    else if (e.key === '?' && !input.value) { e.preventDefault(); toggleKeys(); }
+    else if ((e.key === 'd' || e.key === 'r' || e.key === 'b' || e.key === 'w' || e.key === 'n' || e.key === 'p') && !input.value && !e.ctrlKey && !e.metaKey) {
+        // Single-key shortcuts when input is empty
+        if (e.key === 'd') { e.preventDefault(); run('dash'); }
+        else if (e.key === 'r') { e.preventDefault(); run('recent'); }
+        else if (e.key === 'b') { e.preventDefault(); run('bal'); }
+        else if (e.key === 'w') { e.preventDefault(); run('waterfall'); }
+        else if (e.key === 'n') { e.preventDefault(); run('add'); }
+        else if (e.key === 'p') { e.preventDefault(); run('pnl'); }
+    }
+});
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', () => { document.body.style.height = window.visualViewport.height + 'px'; setTimeout(() => inputWrapper.scrollIntoView({behavior: "auto", block: "end"}), 50); container.scrollTop = container.scrollHeight; }); }
+
+// Escape key to close open modals
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (document.getElementById('editor-modal').classList.contains('open')) { Editor.close(); return; }
+        if (document.getElementById('coa-modal').classList.contains('open')) { COAEditor.close(); return; }
+        if (document.getElementById('keys-modal').classList.contains('open')) { toggleKeys(); return; }
+    }
+});
+
+// Swipe down to dismiss modals on mobile
+(function setupSwipeDismiss() {
+    const modals = ['editor-modal', 'coa-modal'];
+    modals.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        let startY = 0;
+        el.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+        el.addEventListener('touchend', e => {
+            const dy = e.changedTouches[0].clientY - startY;
+            if (dy > 80) {
+                if (id === 'editor-modal') Editor.close();
+                else COAEditor.close();
+            }
+        }, { passive: true });
+    });
+})();
+
+// INIT
+LedgerManager.load(); run('dash'); updatePrediction();
+
+// One-time install nudge — shown after beforeinstallprompt fires
+window.addEventListener('beforeinstallprompt', () => {
+    const key = 'HL_INSTALL_NUDGE';
+    if (localStorage.getItem(key)) return; // already shown once
+    localStorage.setItem(key, '1');
+    setTimeout(() => {
+        log(`<div class="line warn dismissible">📲 Ledgie can be installed as an offline app. <span class="dismiss-btn" onclick="run('install')">Install</span> <span class="dismiss-btn" style="color:var(--accent);margin-left:6px" onclick="this.parentElement.remove()">Later</span></div>`);
+    }, 1500);
+}, { once: true });
+
+// On startup: attempt silent remount of the previously mounted file for this ledger.
+// This works when the browser kept the permission across the session (common in PWA/installed mode).
+// If permission needs a gesture, Persistence.remount() will show a dismissible banner instead.
+(async () => {
+    if (!window.showOpenFilePicker) {
+        // File System API not available — just show localStorage warning
+        if (!LedgerManager.isDefault()) {
+            log('<div class="line warn dismissible" style="cursor:pointer">⚠️ Data is in local storage only. <span class="dismiss-btn" onclick="this.parentElement.remove()">Dismiss</span></div>');
+        }
+        return;
+    }
+    const remounted = await Persistence.remount({ silent: true, fromStartup: true });
+    if (!remounted) {
+        // No handle stored or permission needed — show appropriate banner
+        if (!LedgerManager.isDefault()) {
+            // They had real data but no file mounted
+            log('<div class="line warn dismissible">⚠️ Unsaved changes in local storage. <span class="dismiss-btn" onclick="run(\'mount\')">Mount file</span> <span class="dismiss-btn" style="color:var(--accent);margin-left:6px" onclick="this.parentElement.remove()">Dismiss</span></div>');
+        } else {
+            log('<div class="line warn dismissible" style="opacity:0.7">💾 Storage is local. <span class="dismiss-btn" onclick="run(\'mount\')">Mount a file</span> <span class="dismiss-btn" style="color:var(--accent);margin-left:6px" onclick="this.parentElement.remove()">Dismiss</span></div>');
+        }
+    }
+})();
+</script>
+</body>
+</html>
