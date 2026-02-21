@@ -840,83 +840,97 @@ function isValidRoot(name) { return FIXED_ROOTS.includes(name.split(':')[0]); }
    capable without requiring any external sw.js file.
    ========================================= */
 const PwaManager = {
-    /* ── SVG icon embedded as data URI ─────────────────────────────── */
+    /* ── SVG icon ────────────────────────────────────────────────────── */
     _icon: `data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="%230f172a"/><rect x="24" y="56" width="144" height="4" rx="2" fill="%2338bdf8"/><rect x="24" y="72" width="96" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="84" width="112" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="96" width="80" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="108" width="100" height="3" rx="1.5" fill="%23475569"/><rect x="24" y="120" width="88" height="3" rx="1.5" fill="%23475569"/><rect x="120" y="68" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="80" width="48" height="3" rx="1.5" fill="%23f87171"/><rect x="120" y="92" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="104" width="48" height="3" rx="1.5" fill="%234ade80"/><rect x="120" y="116" width="48" height="3" rx="1.5" fill="%23f87171"/><text x="96" y="42" text-anchor="middle" font-family="monospace" font-size="20" font-weight="bold" fill="%2338bdf8">LEDGIE</text><rect x="24" y="132" width="144" height="2" rx="1" fill="%2338bdf8" opacity="0.4"/><text x="96" y="158" text-anchor="middle" font-family="monospace" font-size="13" fill="%2364748b">ledger</text></svg>`,
-
-    /* ── Service Worker source — runs in its own global scope ───────── */
-    _swSource(cacheName, pageUrl) {
-        return `
-/* Ledgie inline Service Worker — cache-first with network fallback */
-const CACHE = ${JSON.stringify(cacheName)};
-const PAGE  = ${JSON.stringify(pageUrl)};
-
-self.addEventListener('install', e => {
-    e.waitUntil(
-        caches.open(CACHE).then(cache => cache.add(PAGE))
-              .then(() => self.skipWaiting())
-    );
-});
-
-self.addEventListener('activate', e => {
-    e.waitUntil(
-        caches.keys()
-              .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-              .then(() => self.clients.claim())
-    );
-});
-
-self.addEventListener('fetch', e => {
-    /* Only handle GET requests for our own origin */
-    if (e.request.method !== 'GET') return;
-    const url = new URL(e.request.url);
-    if (url.origin !== location.origin) return;
-
-    /* Serve the SW script itself from the sw-store cache (enables restart survival) */
-    if (url.searchParams.has('ledgie-sw')) {
-        e.respondWith(
-            caches.open('ledgie-sw-store-v1')
-                  .then(c => c.match(e.request))
-                  .then(r => r || fetch(e.request))
-        );
-        return;
-    }
-
-    e.respondWith(
-        caches.match(e.request).then(cached => {
-            if (cached) return cached;
-            return fetch(e.request).then(response => {
-                /* Cache successful same-origin responses */
-                if (response && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE).then(c => c.put(e.request, clone));
-                }
-                return response;
-            });
-        }).catch(() => caches.match(PAGE))
-    );
-});
-
-/* Message handler: force update on demand */
-self.addEventListener('message', e => {
-    if (e.data === 'skipWaiting') self.skipWaiting();
-});
-`;
-    },
-
-    /* ── Write SW to Cache Storage so it survives restarts ─────────── */
-    /*
-     * Blob URLs are session-only and die on browser/phone restart.
-     * The fix: store the SW source as a Response in CacheStorage under
-     * a stable synthetic URL, then register THAT URL as the SW.
-     * On restart the SW is already in cache, so it re-activates fine.
-     */
-    SW_CACHE_KEY: 'ledgie-sw-store-v1',
-    SW_VIRTUAL_URL: null,   // set during _registerSW
 
     _deferredPrompt: null,
     _reg: null,
 
-    /* ── Inject <link rel="manifest"> dynamically ───────────────────── */
+    /* ────────────────────────────────────────────────────────────────────
+       HOW OFFLINE-AFTER-RESTART WORKS
+       ──────────────────────────────────────────────────────────────────
+       Problem: Blob URLs (URL.createObjectURL) are RAM-only. When the
+       phone restarts, the browser process dies and all blob URLs vanish.
+       The previously registered SW has no script to re-activate from.
+
+       Solution — "self-hosted SW" pattern:
+         1. Generate SW JS source as a string.
+         2. Store it as a Response in CacheStorage under a stable
+            same-origin URL  →  <pageUrl>?ledgie-sw=1
+         3. Register the SW using that stable URL with updateViaCache:'all'
+            so the browser uses Cache Storage instead of the network.
+         4. The SW's fetch handler intercepts ?ledgie-sw=1 requests and
+            serves itself from cache — completing the self-hosting loop.
+         5. On restart, browser re-activates the SW from Cache Storage
+            without any network, and the SW then serves the app page.
+    ──────────────────────────────────────────────────────────────────── */
+
+    /* ── Build SW source string ─────────────────────────────────────── */
+    _buildSwSource(cacheName, pageUrl, swUrl) {
+        // NOTE: template literal is escaped as a regular string here to
+        // avoid the outer template literal interfering with JS parsing.
+        return [
+            '/* Ledgie Service Worker — self-hosted, restart-safe */',
+            'const CACHE  = ' + JSON.stringify(cacheName) + ';',
+            'const PAGE   = ' + JSON.stringify(pageUrl)   + ';',
+            'const SW_URL = ' + JSON.stringify(swUrl)     + ';',
+            '',
+            'self.addEventListener("install", e => {',
+            '    e.waitUntil((async () => {',
+            '        const cache = await caches.open(CACHE);',
+            '        /* Cache the main page — this is what the user sees offline */',
+            '        try { await cache.add(new Request(PAGE, { cache: "reload" })); } catch(_) {}',
+            '        await self.skipWaiting();',
+            '    })());',
+            '});',
+            '',
+            'self.addEventListener("activate", e => {',
+            '    e.waitUntil(',
+            '        caches.keys()',
+            '              .then(keys => Promise.all(',
+            '                  keys.filter(k => k !== CACHE && k !== "ledgie-v11-sw")',
+            '                      .map(k => caches.delete(k))))',
+            '              .then(() => self.clients.claim())',
+            '    );',
+            '});',
+            '',
+            'self.addEventListener("fetch", e => {',
+            '    if (e.request.method !== "GET") return;',
+            '    const reqUrl = new URL(e.request.url);',
+            '    if (reqUrl.origin !== location.origin) return;',
+            '',
+            '    /* Serve the SW script itself from the sw cache (self-hosting loop) */',
+            '    if (reqUrl.href === SW_URL || reqUrl.searchParams.has("ledgie-sw")) {',
+            '        e.respondWith(',
+            '            caches.open("ledgie-v11-sw")',
+            '                  .then(c => c.match(SW_URL))',
+            '                  .then(r => r || fetch(e.request))',
+            '        );',
+            '        return;',
+            '    }',
+            '',
+            '    /* Cache-first for everything else */',
+            '    e.respondWith(',
+            '        caches.match(e.request).then(cached => {',
+            '            if (cached) return cached;',
+            '            return fetch(e.request).then(res => {',
+            '                if (res && res.status === 200) {',
+            '                    const clone = res.clone();',
+            '                    caches.open(CACHE).then(c => c.put(e.request, clone));',
+            '                }',
+            '                return res;',
+            '            });',
+            '        }).catch(() => caches.match(PAGE))',
+            '    );',
+            '});',
+            '',
+            'self.addEventListener("message", e => {',
+            '    if (e.data === "skipWaiting") self.skipWaiting();',
+            '});'
+        ].join('\n');
+    },
+
+    /* ── Inject manifest ────────────────────────────────────────────── */
     _injectManifest() {
         const manifest = {
             name: 'Ledgie — Smart Ledger',
@@ -934,108 +948,102 @@ self.addEventListener('message', e => {
             ]
         };
         const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        const url  = URL.createObjectURL(blob);
         const link = document.createElement('link');
-        link.rel = 'manifest'; link.href = url;
+        link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
         document.head.appendChild(link);
 
-        // Apple touch icon
         const appleIcon = document.createElement('link');
         appleIcon.rel = 'apple-touch-icon'; appleIcon.href = this._icon;
         document.head.appendChild(appleIcon);
-        // Favicon
+
         const favicon = document.createElement('link');
         favicon.rel = 'icon'; favicon.type = 'image/svg+xml'; favicon.href = this._icon;
         document.head.appendChild(favicon);
     },
 
-    /* ── Register SW via Cache Storage (survives phone restarts) ───── */
-    /*
-     * Blob URLs are session-only: they die on browser/phone restart.
-     * Fix: store the SW source as a Response in CacheStorage under a
-     * stable same-origin URL (pageUrl + ?ledgie-sw=1). The SW's own
-     * fetch handler serves that URL from cache, so re-registration
-     * after a restart works even fully offline.
-     */
+    /* ── Register SW using self-hosted cache pattern ─────────────────── */
     async _registerSW() {
         if (!('serviceWorker' in navigator)) return false;
 
         const pageUrl   = location.href.split('#')[0];
-        const swVirtUrl = pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'ledgie-sw=1';
-        this.SW_VIRTUAL_URL = swVirtUrl;
-
+        // Stable same-origin URL for the SW script
+        const swUrl     = pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'ledgie-sw=1';
         const cacheName = 'ledgie-v11-' + pageUrl.replace(/[^a-z0-9]/gi, '_').slice(-40);
-        const swSource  = this._swSource(cacheName, pageUrl);
+        const swSource  = this._buildSwSource(cacheName, pageUrl, swUrl);
 
         try {
-            // 1. Persist SW source into CacheStorage under the stable virtual URL
-            const swCache = await caches.open(this.SW_CACHE_KEY);
-            await swCache.put(
-                new Request(swVirtUrl),
-                new Response(swSource, { headers: { 'Content-Type': 'application/javascript' } })
+            /* Step 1 ── Write SW source into its own persistent cache.
+               This cache is NEVER cleared by the activate handler, so the
+               SW can serve itself from here on every subsequent restart. */
+            const swStore = await caches.open('ledgie-v11-sw');
+            await swStore.put(
+                new Request(swUrl),
+                new Response(swSource, {
+                    headers: {
+                        'Content-Type': 'application/javascript',
+                        'Cache-Control': 'no-cache'   // not that it matters in Cache API
+                    }
+                })
             );
 
-            // 2. Register using the stable same-origin URL
-            const reg = await navigator.serviceWorker.register(swVirtUrl, { scope: './' });
+            /* Step 2 ── Register using the stable URL.
+               updateViaCache:'all' tells Chrome to use Cache Storage for
+               the SW script check instead of always hitting the network.
+               This is what makes offline re-registration work after restart. */
+            const reg = await navigator.serviceWorker.register(swUrl, {
+                scope: './',
+                updateViaCache: 'all'
+            });
             this._reg = reg;
 
-            // 3. Wait for SW to become active
-            await new Promise((resolve) => {
+            /* Step 3 ── Wait for activation */
+            await new Promise(resolve => {
                 if (reg.active) { resolve(); return; }
                 const sw = reg.installing || reg.waiting;
                 if (!sw) { resolve(); return; }
-                sw.addEventListener('statechange', function onState() {
-                    if (sw.state === 'activated') { sw.removeEventListener('statechange', onState); resolve(); }
+                sw.addEventListener('statechange', function h() {
+                    if (sw.state === 'activated') { sw.removeEventListener('statechange', h); resolve(); }
                 });
             });
 
+            /* Step 4 ── Ensure the page itself is cached NOW (while online).
+               The SW's install event does cache.add(PAGE) but that fetch
+               goes through the SW which might not be intercepting yet.
+               We do an explicit cache.put here from the page side as a
+               belt-and-suspenders guarantee. */
+            try {
+                const appCache = await caches.open(cacheName);
+                const already  = await appCache.match(pageUrl);
+                if (!already) {
+                    const resp = await fetch(pageUrl, { cache: 'reload' });
+                    if (resp.ok) await appCache.put(pageUrl, resp);
+                }
+            } catch (_) { /* offline or fetch blocked — SW install already tried */ }
+
             document.getElementById('pwa-badge').style.display = 'inline';
             return true;
-        } catch(e) {
-            // Fall back to blob URL (works for the current session only)
-            console.warn('Cache-based SW failed, trying blob URL:', e.message);
-            try {
-                const swBlob = new Blob([swSource], { type: 'application/javascript' });
-                const swUrl  = URL.createObjectURL(swBlob);
-                const reg    = await navigator.serviceWorker.register(swUrl, { scope: './' });
-                this._reg = reg;
-                await new Promise((resolve) => {
-                    if (reg.active) { resolve(); return; }
-                    const sw = reg.installing || reg.waiting;
-                    if (!sw) { resolve(); return; }
-                    sw.addEventListener('statechange', function onState() {
-                        if (sw.state === 'activated') { sw.removeEventListener('statechange', onState); resolve(); }
-                    });
-                });
-                console.warn('SW via blob URL — offline will NOT survive restarts.');
-                document.getElementById('pwa-badge').style.display = 'inline';
-                return true;
-            } catch(e2) {
-                console.warn('SW registration failed entirely:', e2.message);
-                return false;
-            }
+
+        } catch (err) {
+            console.warn('SW registration failed:', err.message);
+            return false;
         }
     },
 
-    /* ── Public init — called on page load ─────────────────────────── */
+    /* ── Public init ────────────────────────────────────────────────── */
     async init() {
         this._injectManifest();
         const swOk = await this._registerSW();
 
-        // Network status logging
-        window.addEventListener('offline', () => log('📴 Offline — app running from cache.', 'warn'));
+        window.addEventListener('offline', () => log('📴 Offline — running from cache.', 'warn'));
         window.addEventListener('online',  () => log('📶 Back online.', 'success'));
 
-        // Capture the beforeinstallprompt so we can trigger it via "install" command
         window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
             this._deferredPrompt = e;
-            // Show a subtle hint badge on the install button if it exists
             const badge = document.getElementById('pwa-badge');
             if (badge) { badge.style.display = 'inline'; badge.title = 'App can be installed — type: install'; }
         });
 
-        // Detect when installed
         window.addEventListener('appinstalled', () => {
             this._deferredPrompt = null;
             log('✓ Ledgie installed as an app!', 'success');
@@ -1044,7 +1052,7 @@ self.addEventListener('message', e => {
         return swOk;
     },
 
-    /* ── Trigger install prompt (called by "install" command) ───────── */
+    /* ── Trigger install prompt ─────────────────────────────────────── */
     async promptInstall() {
         if (this._deferredPrompt) {
             this._deferredPrompt.prompt();
@@ -1054,29 +1062,27 @@ self.addEventListener('message', e => {
             else log('Install dismissed.', 'system');
             return;
         }
-        // No prompt available — give platform-specific guidance
         const ua = navigator.userAgent;
         if (/iPhone|iPad|iPod/.test(ua)) {
             log('📱 iOS: Tap the <b>Share</b> button → <b>Add to Home Screen</b>', 'system');
         } else if (/Android/.test(ua)) {
             log('🤖 Android: Tap the browser menu → <b>Add to Home screen</b> or <b>Install app</b>', 'system');
         } else {
-            log('🖥️ Desktop: Click the <b>install icon</b> (⊕) in your browser\'s address bar.', 'system');
-            log('If not visible, the page may need to be served over HTTPS.', 'system');
+            log('🖥️ Desktop: Click the install icon (⊕) in your browser\'s address bar.', 'system');
         }
     },
 
-    /* ── Force SW update ─────────────────────────────────────────────── */
+    /* ── Force SW update ────────────────────────────────────────────── */
     async update() {
         if (!this._reg) { log('No service worker registered.', 'warn'); return; }
         await this._reg.update();
-        log('✓ Update check triggered. Reload to apply if an update was found.', 'success');
+        log('✓ Update check triggered. Reload to apply if found.', 'success');
     }
 };
 
 // Boot PWA on load
 PwaManager.init().then(ok => {
-    if (!ok) console.info('Service Worker not available (blob URL registration unsupported in this browser).');
+    if (!ok) console.info('Service Worker not available in this browser.');
 });
 
 /* =========================================
